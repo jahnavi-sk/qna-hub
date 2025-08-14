@@ -1,8 +1,6 @@
-import { cn } from "@/lib/utils";
 import React, { useRef, useState } from "react";
-import { motion } from "motion/react";
-import { IconUpload } from "@tabler/icons-react";
-import { useDropzone } from "react-dropzone";
+import { motion } from "framer-motion";
+import { Upload } from "lucide-react";
 
 const mainVariant = {
   initial: {
@@ -26,33 +24,87 @@ const secondaryVariant = {
   },
 };
 
+function cn(...classes) {
+  return classes.filter(Boolean).join(' ');
+}
+
 export const FileUpload = ({
   onChange,
   id = "default"
 }) => {
   const [files, setFiles] = useState([]);
+  const [isDragActive, setIsDragActive] = useState(false);
   const fileInputRef = useRef(null);
+  const containerRef = useRef(null); 
 
   const handleFileChange = (newFiles) => {
     setFiles((prevFiles) => [...prevFiles, ...newFiles]);
     onChange && onChange(newFiles);
   };
 
+  const handlePaste = (e) => {
+    console.log("in pastinggg")
+    e.preventDefault();
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    
+    const pastedFiles = [];
+    
+    // Convert DataTransferItemList to array and process
+    Array.from(items).forEach((item) => {
+      if (item.kind === "file") {
+        const file = item.getAsFile();
+        if (file) {
+          pastedFiles.push(file);
+        }
+      }
+    });
+    
+    if (pastedFiles.length > 0) {
+      handleFileChange(pastedFiles);
+    }
+  };
+
+  const handleMouseEnter = () => {
+    if (containerRef.current) {
+      containerRef.current.focus();
+    }
+  };
+
   const handleClick = () => {
     fileInputRef.current?.click();
   };
 
-  const { getRootProps, isDragActive } = useDropzone({
-    multiple: false,
-    noClick: true,
-    onDrop: handleFileChange,
-    onDropRejected: (error) => {
-      console.log(error);
-    },
-  });
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setIsDragActive(false);
+    const droppedFiles = Array.from(e.dataTransfer.files);
+    if (droppedFiles.length > 0) {
+      handleFileChange(droppedFiles);
+    }
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    setIsDragActive(true);
+  };
+
+  const handleDragLeave = () => {
+    setIsDragActive(false);
+  };
 
   return (
-    <div className="w-full" {...getRootProps()}>
+    <div 
+      ref={containerRef}
+      className="w-full" 
+      tabIndex={0}
+      onPaste={handlePaste}
+      onDrop={handleDrop}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onMouseEnter={handleMouseEnter}
+      style={{ outline: 'none' }}
+    >
       <motion.div
         onClick={handleClick}
         whileHover="animate"
@@ -75,6 +127,10 @@ export const FileUpload = ({
           <p
             className="relative z-20 font-sans font-normal text-neutral-400 dark:text-neutral-400 text-base mt-2">
             Drag or drop your files here or click to upload
+          </p>
+          <p
+            className="relative z-20 font-sans font-normal text-blue-400 dark:text-blue-300 text-sm mt-1">
+            You can also paste screenshots here (Cmd+V)
           </p>
           <div className="relative w-full mt-10 max-w-xl mx-auto">
             {files.length > 0 &&
@@ -139,10 +195,10 @@ export const FileUpload = ({
                     animate={{ opacity: 1 }}
                     className="text-neutral-600 flex flex-col items-center">
                     Drop it
-                    <IconUpload className="h-4 w-4 text-neutral-600 dark:text-neutral-400" />
+                    <Upload className="h-4 w-4 text-neutral-600 dark:text-neutral-400" />
                   </motion.p>
                 ) : (
-                  <IconUpload className="h-4 w-4 text-neutral-600 dark:text-neutral-300" />
+                  <Upload className="h-4 w-4 text-neutral-600 dark:text-neutral-300" />
                 )}
               </motion.div>
             )}
@@ -178,6 +234,14 @@ export function GridPattern() {
               }`} />
           );
         }))}
+    </div>
+  );
+}
+
+export default function App() {
+  return (
+    <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900 p-8">
+      <FileUpload onChange={(files) => console.log('Files:', files)} />
     </div>
   );
 }

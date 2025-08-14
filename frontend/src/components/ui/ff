@@ -1,0 +1,79 @@
+export const Card = ({
+  card,
+  index,
+  layout = false
+}) => {
+  // ... existing code ...
+
+  return (
+    <>
+      <AnimatePresence>
+        {open && (
+          <div className="fixed inset-0 z-50 h-screen overflow-auto">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 h-full w-full bg-black/80 backdrop-blur-lg" />
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              ref={containerRef}
+              layoutId={layout ? `card-${card.title}` : undefined}
+              className="relative z-[60] mx-auto my-10 h-fit max-w-6xl rounded-3xl bg-white p-4 font-sans md:p-10 dark:bg-neutral-900">
+              <button
+                className="sticky top-4 right-0 ml-auto flex h-8 w-8 items-center justify-center rounded-full bg-black dark:bg-white"
+                onClick={handleClose}>
+                <IconX className="h-6 w-6 text-neutral-100 dark:text-neutral-900" />
+              </button>
+              <motion.p
+                layoutId={layout ? `category-${card.title}` : undefined}
+                className="text-base font-medium text-black dark:text-white">
+                {card.category}
+              </motion.p>
+              <motion.p
+                layoutId={layout ? `title-${card.title}` : undefined}
+                className="mt-4 text-2xl font-semibold text-neutral-700 md:text-5xl dark:text-white">
+                {card.title}
+              </motion.p>
+              {/* Center the image in modal */}
+              <div className="py-10 flex justify-center">
+                <img 
+                  src={card.src} 
+                  alt={card.title}
+                  className="max-w-full max-h-[60vh] object-contain rounded-lg shadow-lg"
+                />
+              </div>
+              <div className="py-4">{card.content}</div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+      <motion.button
+        layoutId={layout ? `card-${card.title}` : undefined}
+        onClick={handleOpen}
+        className="relative z-10 flex h-64 w-80 flex-col items-start justify-start overflow-hidden rounded-3xl bg-gray-100 md:h-80 md:w-96 dark:bg-neutral-900">
+        {/* Adjusted gradient for horizontal images */}
+        <div className="pointer-events-none absolute inset-0 z-30 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+        <div className="relative z-40 p-6 mt-auto">
+          <motion.p
+            layoutId={layout ? `category-${card.category}` : undefined}
+            className="text-left font-sans text-sm font-medium text-white md:text-base">
+            {card.category}
+          </motion.p>
+          <motion.p
+            layoutId={layout ? `title-${card.title}` : undefined}
+            className="mt-2 max-w-xs text-left font-sans text-lg font-semibold [text-wrap:balance] text-white md:text-xl">
+            {card.title}
+          </motion.p>
+        </div>
+        <BlurImage
+          src={card.src}
+          alt={card.title}
+          fill="false"
+          className="absolute inset-0 z-10 object-cover" />
+      </motion.button>
+    </>
+  );
+};
