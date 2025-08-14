@@ -278,12 +278,7 @@ const FlipCard = ({ question, isFlipped, onFlip, onToggleComplete }) => {
               draggable={false}
               style={{ display: 'block', maxWidth: '100%', maxHeight: '100%' }}
             />
-            <div className="absolute top-2 left-2 bg-green-500 text-white px-2 py-1 rounded text-sm font-medium">
-              Answer
-            </div>
-            <div className="absolute bottom-2 right-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-xs">
-              Click to flip back
-            </div>
+           
             
           </div>
         </div>

@@ -4,14 +4,39 @@ import { Label } from "../components/ui/label";
 import { motion, AnimatePresence } from "motion/react";
 import { Input } from "../components/ui/input";
 import { cn } from "@/lib/utils";
+import { useRouter } from "next/navigation";
+
 
 
 export default function LoginPg() {
+    const router = useRouter();
   const [formType, setFormType] = useState("signup");
 
-  const handleUserSubmit = (e) => {
+  const handleUserSubmit = async (e) => {
     e.preventDefault();
-    console.log("User Sign Up submitted");
+    const username = e.target.firstname.value;
+    const email = e.target.email.value;
+    const password = e.target.password.value; 
+
+    try{
+      const res = await fetch("http://127.0.0.1:5000/api/signup", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ username, email, password }),
+      });
+      const data = await res.json();
+      if (data.success) {
+      alert("Sign up successful!");
+      router.replace("/user");
+      // setFormType("login");
+    } else {
+      alert(data.error || "Sign up failed");
+    }
+  } catch (err) {
+    alert("Server error. Please try again.");
+  }
   };
 
   const handleAdminSubmit = (e) => {
@@ -19,9 +44,29 @@ export default function LoginPg() {
     console.log("Admin Sign In submitted");
   };
 
-  const handleUserLogin = (e) => {
+  const handleUserLogin = async (e) => {
     e.preventDefault();
-    console.log("User Log In submitted");
+    const username = e.target["firstname"].value; // If you use email as username
+  const password = e.target["login-password"].value;
+
+  try {
+    const res = await fetch("http://127.0.0.1:5000/api/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password }),
+    });
+
+    const data = await res.json();
+    if (data.success) {
+      alert("Login successful!");
+      router.replace("/user");
+      // Redirect or set user state here
+    } else {
+      alert(data.error || "Login failed");
+    }
+  } catch (err) {
+    alert("Server error. Please try again.");
+  }
   };
 
   return (
@@ -41,22 +86,19 @@ export default function LoginPg() {
                 User Sign Up
               </h2>
               <p className="mt-2 max-w-sm text-sm text-neutral-600 dark:text-neutral-300">
-                Welcome to Aceternity. Sign up as a user.
+                Welcome to QnA Hub. Sign up as a user.
               </p>
               <form className="my-8" onSubmit={handleUserSubmit}>
                 <div className="mb-4 flex flex-col space-y-2 md:flex-row md:space-y-0 md:space-x-2">
                   <LabelInputContainer>
-                    <Label htmlFor="firstname">First name</Label>
-                    <Input id="firstname" placeholder="Tyler" type="text" />
+                    <Label htmlFor="firstname">Username</Label>
+                    <Input id="firstname" placeholder="Virat" type="text" />
                   </LabelInputContainer>
-                  <LabelInputContainer>
-                    <Label htmlFor="lastname">Last name</Label>
-                    <Input id="lastname" placeholder="Durden" type="text" />
-                  </LabelInputContainer>
+                  
                 </div>
                 <LabelInputContainer className="mb-4">
                   <Label htmlFor="email">Email Address</Label>
-                  <Input id="email" placeholder="projectmayhem@fc.com" type="email" />
+                  <Input id="email" placeholder="viratkohli@fc.com" type="email" />
                 </LabelInputContainer>
                 <LabelInputContainer className="mb-4">
                   <Label htmlFor="password">Password</Label>
@@ -106,8 +148,8 @@ export default function LoginPg() {
               </p>
               <form className="my-8" onSubmit={handleUserLogin}>
                 <LabelInputContainer className="mb-4">
-                  <Label htmlFor="login-email">Email Address</Label>
-                  <Input id="login-email" placeholder="projectmayhem@fc.com" type="email" />
+                  <Label htmlFor="firstname">Email Address</Label>
+                  <Input id="firstname" placeholder="viratkohli" type="text" />
                 </LabelInputContainer>
                 <LabelInputContainer className="mb-4">
                   <Label htmlFor="login-password">Password</Label>
@@ -153,7 +195,7 @@ export default function LoginPg() {
                 Admin Sign In
               </h2>
               <p className="mt-2 max-w-sm text-sm text-neutral-600 dark:text-neutral-300">
-                Sign in as an admin to manage Aceternity.
+                Sign in as an admin to manage QnA Hub.
               </p>
               <form className="my-8" onSubmit={handleAdminSubmit}>
                 <LabelInputContainer className="mb-4">
