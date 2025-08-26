@@ -11,7 +11,8 @@ CORS(app, resources={r"/*": {"origins": "http://localhost:3000"}})
 
 # CORS(app, resources={r"/api/*": {"origins": "http://localhost:3000"}}, supports_credentials=True)
 
-
+DB_PASSWORD = "hi"  
+DB_USER = "root"
 def unique_filename(filename):
     name, ext = os.path.splitext(filename)
     timestamp = int(time.time() * 1000)
@@ -20,8 +21,8 @@ def unique_filename(filename):
 # Configure MySQL connection
 db = mysql.connector.connect(
     host="localhost",
-    user="root",
-    password="hi",
+    user=DB_USER,
+    password=DB_PASSWORD,
     database="qnahub"
 )
 cursor = db.cursor(dictionary=True)
@@ -178,8 +179,8 @@ def get_questions():
     # Create a new connection for this request
     db = mysql.connector.connect(
         host="localhost",
-        user="root",
-        password="pwd",
+        user=DB_USER,
+        password=DB_PASSWORD,
         database="qnahub"
     )
     cursor = db.cursor(dictionary=True)

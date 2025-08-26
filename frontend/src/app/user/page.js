@@ -227,7 +227,7 @@ export default function HomePage() {
   const router = useRouter();
   
   useEffect(() => {
-    router.replace("/user/all");
+    router.replace("/user/new");
   }, [router]);
   
   return null;
