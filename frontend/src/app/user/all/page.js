@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Sidebar, SidebarBody, SidebarLink } from "../../../components/ui/sidebar";
 import { Carousel, Card } from "../../../components/ui/apple-cards-carousel";
 import { useRouter, usePathname } from "next/navigation";
@@ -119,76 +119,127 @@ export const LogoIcon = () => {
 
 // Dummy dashboard component with content
 const Dashboard = () => {
-    // Create cards for the first carousel
-    const cards1 = data.map((card, index) => (
-      <Card key={`carousel1-${card.src}`} card={card} index={index} />
-    ));
+    const [carouselData, setCarouselData] = useState([[], []]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+
+    useEffect(() => {
+        fetch("http://127.0.0.1:5000/api/questions/completed?user_id=default_user")
+            .then(res => {
+                if (!res.ok) {
+                    throw new Error(`HTTP error! status: ${res.status}`);
+                }
+                return res.json();
+            })
+            .then(data => {
+                if (data.length === 0) {
+                    setCarouselData([[], []]);
+                    setLoading(false);
+                    return;
+                }
+
+                const cards = data.map((q, idx) => ({
+                    category: "Completed Question",
+                    title: `Question #${q.id}`,
+                    src: `http://127.0.0.1:5000${q.question_image}`,
+                    content: <DummyContent completedAt={q.completed_at} />,
+                }));
+
+                // Split into two carousels of max 25 each
+                setCarouselData([
+                    cards.slice(0, 25),
+                    cards.slice(25, 50)
+                ]);
+                setLoading(false);
+            })
+            .catch(err => {
+                setError(err.message);
+                setLoading(false);
+            });
+    }, []);
+
+    // Create cards for carousels
+    const cards1 = carouselData[0]?.map((card, index) => (
+        <Card key={`carousel1-${card.src}`} card={card} index={index} />
+    )) || [];
     
-    // Create cards for the second carousel
-    const cards2 = data.map((card, index) => (
-      <Card key={`carousel2-${card.src}`} card={card} index={index} />
-    ));
-  
-  return (
-    <div className="w-full h-full py-20">
-      <h2 className="max-w-7xl pl-4 mx-auto text-xl md:text-5xl font-bold text-neutral-800 dark:text-neutral-200 font-sans">
-        Welcome back ! 
-      </h2>
-      {/* First carousel with unique ID */}
-      <Carousel items={cards1} id="carousel1" />
-      
-      
-      {/* Second carousel with unique ID */}
-      <Carousel items={cards2} id="carousel2" />
-    </div>
-  );
+    const cards2 = carouselData[1]?.map((card, index) => (
+        <Card key={`carousel2-${card.src}`} card={card} index={index} />
+    )) || [];
+
+    if (loading) {
+        return (
+            <div className="flex-1 flex items-center justify-center">
+                <div className="text-lg text-neutral-600 dark:text-neutral-400">
+                    Loading completed questions...
+                </div>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="flex-1 flex items-center justify-center">
+                <div className="text-lg text-red-600 dark:text-red-400">
+                    Error: {error}
+                </div>
+            </div>
+        );
+    }
+
+    if (carouselData[0].length === 0 && carouselData[1].length === 0) {
+        return (
+            <div className="flex-1 flex items-center justify-center">
+                <div className="text-center">
+                    <h2 className="text-2xl font-bold text-neutral-800 dark:text-neutral-200 mb-4">
+                        No completed questions yet!
+                    </h2>
+                    <p className="text-neutral-600 dark:text-neutral-400">
+                        Complete some questions in your practice session to see them here.
+                    </p>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="w-full h-full py-20">
+            <h2 className="max-w-7xl pl-4 mx-auto text-xl md:text-5xl font-bold text-neutral-800 dark:text-neutral-200 font-sans">
+                Questions completed in the past 7 days
+            </h2>
+            
+            {/* First carousel - only show if it has items */}
+            {cards1.length > 0 && (
+                <Carousel items={cards1} id="carousel1" />
+            )}
+            
+            {/* Second carousel - only show if it has items */}
+            {cards2.length > 0 && (
+                <Carousel items={cards2} id="carousel2" />
+            )}
+        </div>
+    );
 };
 
 
-const DummyContent = () => {
-  return (
-    <>
-      hi
-    </>
-  );
+const DummyContent = ({ completedAt }) => {
+    const formatDate = (dateString) => {
+        const date = new Date(dateString);
+        return date.toLocaleDateString() + ' at ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+    };
+
+    return (
+        <div className="bg-[#F5F5F7] dark:bg-neutral-800 p-8 md:p-14 rounded-3xl mb-4">
+            <p className="text-neutral-600 dark:text-neutral-400 text-base md:text-2xl font-sans max-w-3xl mx-auto">
+                <span className="font-bold text-neutral-700 dark:text-neutral-200">
+                    Completed on: {completedAt ? formatDate(completedAt) : 'Unknown'}
+                </span>
+            </p>
+            <div className="flex justify-center mt-6">
+                <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                    ✓ Completed
+                </span>
+            </div>
+        </div>
+    );
 };
- 
-const data = [
-  {
-    category: "Artificial Intelligence",
-    title: "You can do more with AI.",
-    src: "/Questions/00A6DC2800A65045280ADCA076732C76105A-q.png",
-    content: <DummyContent />,
-  },
-  {
-    category: "Productivity",
-    title: "Enhance your productivity.",
-    src: "https://images.unsplash.com/photo-1531554694128-c4c6665f59c2?q=80&w=3387&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
-    content: <DummyContent />,
-  },
-  {
-    category: "Product",
-    title: "Launching the new Apple Vision Pro.",
-    src: "https://images.unsplash.com/photo-1713869791518-a770879e60dc?q=80&w=2333&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
-    content: <DummyContent />,
-  },
- 
-  {
-    category: "Product",
-    title: "Maps for your iPhone 15 Pro Max.",
-    src: "https://images.unsplash.com/photo-1599202860130-f600f4948364?q=80&w=2515&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
-    content: <DummyContent />,
-  },
-  {
-    category: "iOS",
-    title: "Photography just got better.",
-    src: "https://images.unsplash.com/photo-1602081957921-9137a5d6eaee?q=80&w=2793&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
-    content: <DummyContent />,
-  },
-  {
-    category: "Hiring",
-    title: "Hiring for a Staff Software Engineer",
-    src: "https://images.unsplash.com/photo-1511984804822-e16ba72f5848?q=80&w=2048&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
-    content: <DummyContent />,
-  },
-];

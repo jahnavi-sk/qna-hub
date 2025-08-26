@@ -1,12 +1,13 @@
 "use client";
-import React , {useState} from "react";
+import React , {useState , useEffect} from "react";
 import { FileUpload } from "../../components/ui/file-upload";
 import { InfiniteMovingCards } from "../../components/ui/infinite-moving-cards";
+import { useRouter } from "next/navigation";
 
 
 export default function AdminLand(){
-
-    const TAG_SUGGESTIONS = [
+  const router = useRouter();
+  const TAG_SUGGESTIONS = [
   "math",
   "science",
   "history",
@@ -19,19 +20,71 @@ export default function AdminLand(){
   "machine learning",
 ];
 
+
+    
     const [questions, setQuestions] = useState([]);
     const [showUpload, setShowUpload] = useState(false);
     const [tagInput, setTagInput] = useState("");
     const [tags, setTags] = useState([]);
     const [showSuggestions, setShowSuggestions] = useState(false);
 
+    const [questionFile, setQuestionFile] = useState(null);
+    const [answerFile, setAnswerFile] = useState(null);
+    const [testimonials, setTestimonials] = useState([]);
+
+
+
+    useEffect(() => {
+      // console.log("in here");
+    fetch("http://127.0.0.1:5000/api/questions")
+      .then(res => res.json())
+      .then(data => {
+        console.log(data);
+        // Format tags as a string for display
+        setTestimonials(
+          data.map(q => ({
+            question: `http://127.0.0.1:5000${q.question_image}`, // This is the image path
+            tags: q.tags || ""
+          }))
+        );
+      });
+  }, []);
+
 
     const handleAddQuestions = () => {
         setShowUpload(true);
     }; 
-    const handleSave = () => {
+    const handleSave = async () => {
+      if (!questionFile || !answerFile) {
+
+        alert("Please upload both question and answer files.");
+        return;
+      }
+      
+
+      const formData = new FormData();
+      formData.append("question", questionFile);
+      formData.append("answer", answerFile);
+      tags.forEach(tag => formData.append("tags[]", tag));
         // Logic to save questions
-        console.log("Saves button clicked");
+        try{
+          const res = await fetch("http://127.0.0.1:5000/api/admin/upload", {
+            method: "POST",
+            body: formData,
+        });
+          if (res.ok) {
+          alert("Upload successful!");
+          setShowUpload(false);
+          // router.replace("/user");
+          } else {
+            const data = await res.json();
+            alert(data.error || "Upload failed");
+          }
+        }
+        catch{
+           alert("Upload failed - catch");
+        }
+        
     };   
 
     const filteredSuggestions = TAG_SUGGESTIONS.filter(
@@ -55,28 +108,28 @@ export default function AdminLand(){
   };
 
 
-  const testimonials = [
-  {
-    question:"img1.jpg",
-    tags: "science"
-  },
-  {
-    question:"img1.jpg",
-    tags: "physics"
-  },
-  {
-    question:"img1.jpg",
-    tags: "math"
-  },
-  {
-    question:"img1.jpg",
-    tags: "english"
-  },
-  {
-    question:"img1.jpg",
-    tags: "science, physics"
-  }
-];
+//   const testimonials = [
+//   {
+//     question:"img1.jpg",
+//     tags: "science"
+//   },
+//   {
+//     question:"img1.jpg",
+//     tags: "physics"
+//   },
+//   {
+//     question:"img1.jpg",
+//     tags: "math"
+//   },
+//   {
+//     question:"img1.jpg",
+//     tags: "english"
+//   },
+//   {
+//     question:"img1.jpg",
+//     tags: "science, physics"
+//   }
+// ];
 
 
 
@@ -103,10 +156,27 @@ export default function AdminLand(){
             </div>
             <div className="h-[40rem] w-full rounded-md flex flex-col antialiased bg-white dark:bg-black dark:bg-grid-white/[0.05] items-center justify-center relative overflow-hidden">
             <InfiniteMovingCards
-                items={testimonials}
+                items={testimonials.map(item => {
+                  console.log("item.question:", item.question);
+                  
+                  // Render the image in your card component
+                  return{
+                    ...item,
+                  render: (
+                    <div>
+                      <img
+                        src={item.question}
+                        alt={item.tags}
+                        className="w-32 h-32 object-contain mx-auto"
+                      />
+                      <div>{item.tags}</div>
+                    </div>
+                  )
+                };
+                })}
                 direction="right"
-                speed="slow"
-            />
+                speed="fast"
+              />
 
           </div>
         </div>
@@ -116,11 +186,11 @@ export default function AdminLand(){
           <div className="mt-10 pt-5 flex flex-row justify-center gap-8">
             <div className="flex flex-col items-center justify-center">
               <span className="mb-2 font-medium">Question File Upload:</span>
-              <FileUpload id="questions" onChange={(files) => setQuestions(files)} />
+              <FileUpload id="questions" onChange={(files) => setQuestionFile(files[0])} />
             </div>
             <div className="flex flex-col items-center justify-center">
               <span className="mb-2 font-medium">Answer File Upload:</span>
-              <FileUpload id="answers" onChange={(files) => {}} />
+              <FileUpload id="answers" onChange={(files) => setAnswerFile(files[0])} />
             </div>
           </div>
           <div className="mt-8 flex flex-col items-center">

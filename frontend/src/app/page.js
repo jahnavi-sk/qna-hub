@@ -9,7 +9,7 @@ import { useRouter } from "next/navigation";
 
 
 export default function LoginPg() {
-    const router = useRouter();
+  const router = useRouter();
   const [formType, setFormType] = useState("signup");
 
   const handleUserSubmit = async (e) => {

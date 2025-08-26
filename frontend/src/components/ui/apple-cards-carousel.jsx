@@ -215,7 +215,9 @@ export const Card = ({
                   className="max-w-full max-h-[60vh] object-contain rounded-lg shadow-lg"
                 />
               </div>
-              <div className="py-4">{card.content}</div>
+              <div className="py-4">
+                {typeof card.content === 'function' ? <card.content /> : card.content}
+              </div>
             </motion.div>
           </div>
         )}

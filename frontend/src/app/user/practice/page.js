@@ -143,32 +143,7 @@ const slideData = [
       src: "https://images.unsplash.com/photo-1679420437432-80cfbf88986c?q=80&w=3540&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
     },
   ];
-const practiceQuestions = [
-  {
-    id: 1,
-    questionImage: "/Questions/q1.png",
-    answerImage: "/Answers/a1.png",
-    completed: false
-  },
-  {
-    id: 2,
-    questionImage: "/Questions/q2.png",
-    answerImage: "/Answers/a2.png",
-    completed: false
-  },
-  {
-    id: 3,
-    questionImage: "/Questions/q3.png",
-    answerImage: "/Answers/a3.png",
-    completed: false
-  },
-  {
-    id: 4,
-    questionImage: "/Questions/q4.png",
-    answerImage: "/Answers/a4.png",
-    completed: false
-  }
-];
+// No default questions, will load from localStorage
 
 const FlipCard = ({ question, isFlipped, onFlip, onToggleComplete }) => {
   const [questionImgLoaded, setQuestionImgLoaded] = useState(false);
@@ -339,11 +314,59 @@ const FlipCard = ({ question, isFlipped, onFlip, onToggleComplete }) => {
 
 // Replace this with your actual component in page.js
 const Dashboard = () => {
-  const [questions, setQuestions] = useState(practiceQuestions);
+  const [questions, setQuestions] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [flippedStates, setFlippedStates] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+
+  useEffect(() => {
+  if (questions.length > 0 && questions.every(q => q.completed)) {
+    // All completed, clear localStorage
+    localStorage.removeItem('practiceSessionQuestions');
+  }
+}, [questions]);
+ 
+  useEffect(() => {
+    // Load question IDs from localStorage
+    let ids = [];
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('practiceSessionQuestions');
+      if (stored) ids = JSON.parse(stored);
+    }
+    if (!ids.length) {
+      setQuestions([]);
+      setLoading(false);
+      return;
+    }
+    // Fetch question data from backend
+    setLoading(true);
+    fetch(`http://127.0.0.1:5000/api/questions_by_ids?ids=${ids.join(',')}`)
+      .then(res => {
+        if (!res.ok) throw new Error('Failed to fetch questions');
+        return res.json();
+      })
+      .then(data => {
+        // Add completed: false to each question
+        setQuestions(
+          data.map(q => ({
+      ...q,
+      questionImage: `http://127.0.0.1:5000${q.question_image}`,
+      answerImage: `http://127.0.0.1:5000${q.answer_image}`,
+      completed: false,
+    }))
+      );
+        setLoading(false);
+      })
+      .catch(err => {
+        setError(err.message);
+        setLoading(false);
+      });
+  }, []);
 
   const handleFlip = (questionId) => {
+    
     setFlippedStates(prev => ({
       ...prev,
       [questionId]: !prev[questionId]
@@ -351,10 +374,35 @@ const Dashboard = () => {
   };
 
   const handleToggleComplete = (questionId) => {
-    setQuestions(prev => prev.map(q => 
-      q.id === questionId ? { ...q, completed: !q.completed } : q
-    ));
-  };
+
+    
+
+  setQuestions(prev => prev.map(q => 
+    q.id === questionId ? { ...q, completed: !q.completed } : q
+  ));
+
+  fetch(`http://127.0.0.1:5000/api/questions/${questionId}/complete`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      user_id: 'default_user'
+    })
+  });
+
+  // Remove from localStorage if completed
+  if (typeof window !== 'undefined') {
+    let arr = [];
+    const stored = localStorage.getItem('practiceSessionQuestions');
+    if (stored) arr = JSON.parse(stored);
+    arr = arr.filter(id => id !== questionId);
+    localStorage.setItem('practiceSessionQuestions', JSON.stringify(arr));
+  }
+
+  
+
+};
 
   const nextQuestion = () => {
     setCurrentIndex(prev => (prev + 1) % questions.length);
@@ -366,7 +414,17 @@ const Dashboard = () => {
 
   const currentQuestion = questions[currentIndex];
   const completedCount = questions.filter(q => q.completed).length;
-  const progress = (completedCount / questions.length) * 100;
+  const progress = questions.length ? (completedCount / questions.length) * 100 : 0;
+
+  if (loading) {
+    return <div className="w-full h-full flex items-center justify-center text-lg">Loading practice questions...</div>;
+  }
+  if (error) {
+    return <div className="w-full h-full flex items-center justify-center text-red-600">{error}</div>;
+  }
+  if (!questions.length) {
+    return <div className="w-full h-full flex items-center justify-center text-neutral-600">No practice questions added yet. Go to Explore and add some!</div>;
+  }
 
   return (
     <div className="w-full h-full p-4 bg-gray-50 dark:bg-black overflow-auto">
@@ -379,7 +437,6 @@ const Dashboard = () => {
           <p className="text-gray-600 dark:text-gray-300 mb-4">
             Question {currentIndex + 1} of {questions.length}
           </p>
-          
           {/* Progress Bar */}
           <div className="w-full max-w-md mx-auto bg-gray-200 dark:bg-gray-700 rounded-full h-2 mb-4">
             <div 
@@ -391,7 +448,6 @@ const Dashboard = () => {
             {completedCount} of {questions.length} questions completed
           </p>
         </div>
-
         {/* Main Card Area */}
         <div className="flex flex-col items-center mb-6">
           <FlipCard
@@ -401,7 +457,6 @@ const Dashboard = () => {
             onToggleComplete={() => handleToggleComplete(currentQuestion.id)}
           />
         </div>
-
         {/* Navigation */}
         <div className="flex justify-between items-center max-w-md mx-auto">
           <button
@@ -412,11 +467,9 @@ const Dashboard = () => {
             <ChevronLeft size={20} />
             Previous
           </button>
-
           <span className="text-gray-600 dark:text-gray-300 font-medium">
             {currentIndex + 1} / {questions.length}
           </span>
-
           <button
             onClick={nextQuestion}
             disabled={questions.length <= 1}
@@ -426,7 +479,6 @@ const Dashboard = () => {
             <ChevronRight size={20} />
           </button>
         </div>
-
         {/* Summary */}
         {completedCount === questions.length && (
           <div className="mt-8 p-6 bg-green-50 dark:bg-green-900 border border-green-200 dark:border-green-700 rounded-lg text-center">
@@ -439,7 +491,6 @@ const Dashboard = () => {
           </div>
         )}
       </div>
-
       <style jsx>{`
         .rotate-y-180 {
           transform: rotateY(180deg);
