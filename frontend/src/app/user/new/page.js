@@ -71,19 +71,7 @@ export default function ExplorePage() {
                 </div>
               </div>
               <div>
-                <SidebarLink
-                  link={{
-                    label: "Yatharth",
-                    href: "#",
-                    icon: (
-                      <img
-                        src="https://assets.aceternity.com/manu.png"
-                        className="h-7 w-7 shrink-0 rounded-full"
-                        width={50}
-                        height={50}
-                        alt="Avatar" />
-                    ),
-                  }} />
+                
               </div>
             </SidebarBody>
           </Sidebar>
@@ -122,316 +110,438 @@ export const LogoIcon = () => {
 };
 
 const Dashboard = () => {
-
-    const [showSearchModal, setShowSearchModal] = useState(false);
-    const [modalInput, setModalInput] = useState("");
-    const [showSuggestions, setShowSuggestions] = useState(false);
-    const [carouselData, setCarouselData] = useState([]);
+    const [inputValue, setInputValue] = useState('');
+    const [enteredTags, setEnteredTags] = useState([]);
+    const [questions, setQuestions] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
-    const [searchTags, setSearchTags] = useState("");
-    const [restored, setRestored] = useState(false);
+    const [hasSearched, setHasSearched] = useState(false);
+    const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+    const [showAnswer, setShowAnswer] = useState(false);
+    const [questionAnswers, setQuestionAnswers] = useState({});
 
-    const placeholders = [
-        "Physics, Motion, Pseudo Force",
-        "Chemistry, Ions, Orbitals",
-        "Physics, Tension, Stress ",
-        "Chemistry, d block elements",
-    ];
-
+    // Keyboard navigation
     useEffect(() => {
-        const savedShowSuggestions = localStorage.getItem("explore_showSuggestions");
-        const savedSearchTags = localStorage.getItem("explore_searchTags");
-        
-        if (savedShowSuggestions !== null) {
-            setShowSuggestions(JSON.parse(savedShowSuggestions));
-        }
-        if (savedSearchTags !== null) {
-            setSearchTags(savedSearchTags);
-        }
-        setRestored(true);
-    }, []);
-
-    // SAVE state when it changes
-    useEffect(() => {
-        if (restored) {
-            localStorage.setItem("explore_showSuggestions", JSON.stringify(showSuggestions));
-        }
-    }, [showSuggestions, restored]);
-
-    useEffect(() => {
-        if (restored) {
-            localStorage.setItem("explore_searchTags", searchTags);
-        }
-    }, [searchTags, restored]);
-
-    // FETCH questions when needed
-    useEffect(() => {
-        if (restored && showSuggestions) {
-            setLoading(true);
-            setError(null);
-            let url = "http://127.0.0.1:5000/api/questions?user_id=default_user";
-            if (searchTags.trim()) {
-                url += `&tags=${encodeURIComponent(searchTags)}`;
-            }
-            fetch(url)
-                .then(res => {
-                    if (!res.ok) {
-                        throw new Error(`HTTP error! status: ${res.status}`);
+        const handleKeyDown = (e) => {
+            // Don't handle navigation keys if user is typing in the input
+            if (document.activeElement?.tagName === 'INPUT') return;
+            
+            if (questions.length === 0) return;
+            
+            switch(e.key) {
+                case 'ArrowRight':
+                    e.preventDefault();
+                    setCurrentQuestionIndex((prev) => 
+                        prev < questions.length - 1 ? prev + 1 : 0
+                    );
+                    setShowAnswer(false);
+                    break;
+                case 'ArrowLeft':
+                    e.preventDefault();
+                    setCurrentQuestionIndex((prev) => 
+                        prev > 0 ? prev - 1 : questions.length - 1
+                    );
+                    setShowAnswer(false);
+                    break;
+                case 'ArrowDown':
+                    e.preventDefault();
+                    if (!showAnswer) {
+                        loadAnswerForQuestion(questions[currentQuestionIndex]);
                     }
-                    return res.json();
-                })
-                .then(data => {
-                    const cards = data.map((q, idx) => ({
-                        category: "Question",
-                        title: `Question #${q.id}`,
-                        src: `http://127.0.0.1:5000${q.question_image}`,
-                        content: <DummyContent questionId={q.id}/>, 
-                    }));
-                    setCarouselData([
-                        cards.slice(0, 25),
-                        cards.slice(25, 50)
-                    ]);
-                    setLoading(false);
-                })
-                .catch(err => {
-                    setError(err.message);
-                    setLoading(false);
-                });
-        }
-    }, [restored, showSuggestions, searchTags]);
-
-
-
-    
-
-    
-    const handleChange = (e) => {
-        setSearchTags(e.target.value);
-    };
-
-    const onSubmit = (e) => {
-        e.preventDefault();
-        setShowSuggestions(true);
-    };
-
-    if (!restored) {
-        return (
-            <div className="flex-1 flex items-center justify-center">
-                <div className="text-lg text-neutral-600 dark:text-neutral-400">
-                    Loading...
-                </div>
-            </div>
-        );
-    }
-
-    // Create cards for the first carousel
-    const cards1 = carouselData[0]?.map((card, index) => (
-        <Card key={`carousel1-${card.src}`} card={card} index={index} />
-    )) || [];
-    
-    // Create cards for the second carousel
-    const cards2 = carouselData[1]?.map((card, index) => (
-        <Card key={`carousel2-${card.src}`} card={card} index={index} />
-    )) || [];
-
-    return (
-        <div className="flex-1">
-            {showSuggestions && (
-                <div className="w-full h-full py-20">
-                    <h2 className="max-w-7xl pl-4 mx-auto text-xl md:text-5xl font-bold text-neutral-800 dark:text-neutral-200 font-sans">
-                        {searchTags.trim() ? 
-                `Getting questions of tags: ${searchTags}` : 
-                "Explore new questions!"
-            }
-                    </h2>
-                    
-                    <button
-                        onClick={() => setShowSearchModal(true)}
-                        className="absolute top-8 right-8 bg-white/80 hover:bg-white p-2 rounded-full shadow"
-                        aria-label="Open search"
-                    >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <circle cx="11" cy="11" r="8" strokeWidth="2" />
-                            <line x1="21" y1="21" x2="16.65" y2="16.65" strokeWidth="2" />
-                        </svg>
-                    </button>
-
-                    {/* Loading state */}
-                    {loading && (
-                        <div className="flex justify-center items-center py-20">
-                            <div className="text-lg text-neutral-600 dark:text-neutral-400">
-                                Loading questions...
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Error state */}
-                    {error && (
-                        <div className="flex justify-center items-center py-20">
-                            <div className="text-lg text-red-600 dark:text-red-400">
-                                Error loading questions: {error}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Carousels */}
-                    {!loading && !error && carouselData.length > 0 && (
-                        <>
-                            {cards1.length > 0 && (
-                                <Carousel items={cards1} id="carousel1" />
-                            )}
-                            
-                            {cards2.length > 0 && (
-                                <Carousel items={cards2} id="carousel2" />
-                            )}
-                        </>
-                    )}
-
-                    {/* No data state */}
-                    {!loading && !error && (carouselData.length === 0 || (carouselData[0]?.length === 0 && carouselData[1]?.length === 0)) && showSuggestions && (
-                        <div className="flex justify-center items-center py-20">
-                            <div className="text-lg text-neutral-600 dark:text-neutral-400">
-                                Oops! Questions not found! Contact your admin.
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Update the modal search functionality */}
-                    {showSearchModal && (
-                        <div
-                            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
-                            onClick={() => setShowSearchModal(false)}
-                        >
-                          <div
-                              className="bg-white dark:bg-neutral-900 rounded-xl p-8 shadow-lg w-full max-w-md relative"
-                              onClick={e => e.stopPropagation()}
-                          >
-                              <button
-                                  className="absolute top-2 right-2 text-gray-400 hover:text-gray-700"
-                                  onClick={() => setShowSearchModal(false)}
-                                  aria-label="Close"
-                              >
-                                  ×
-                              </button>
-                              <h3 className="mb-4 text-lg font-semibold text-center dark:text-white">Search Questions</h3>
-                              <PlaceholdersAndVanishInput
-                                  placeholders={["Enter tags: chemistry, physics..."]}
-                                  value={modalInput}
-                                  onChange={e => setModalInput(e.target.value)}
-                                  onSubmit={e => {
-                                      e.preventDefault();
-                                      if (modalInput.trim()) {
-                                          setSearchTags(modalInput.trim());
-                                          setShowSuggestions(true);
-                                          setShowSearchModal(false);
-                                          setModalInput(""); // Clear the modal input
-                                      }
-                                  }}
-                              />
-                          </div>
-                      </div>
-                  )}
-                </div>
-            )}
-
-            {!showSuggestions && (
-                <div className="flex min-h-screen w-full flex-col justify-center items-center px-4">
-                    <h2 className="mb-10 sm:mb-20 text-xl text-center sm:text-5xl dark:text-white text-black">
-                        Search for Questions by tags !
-                    </h2>
-                    <PlaceholdersAndVanishInput
-                        placeholders={placeholders}
-                        onChange={handleChange}
-                        onSubmit={onSubmit}
-                    />
-                </div>
-            )}
-        </div>
-    );
-};
-
-const DummyContent = ({ questionId }) => {
-    const [isAdded, setIsAdded] = useState(() => {
-        if (typeof window !== 'undefined') {
-            const stored = localStorage.getItem('practiceSessionQuestions');
-            if (stored) {
-                const arr = JSON.parse(stored);
-                return arr.includes(questionId);
-            }
-        }
-        return false;
-    });
-
-    useEffect(() => {
-        const sync = () => {
-            const stored = localStorage.getItem('practiceSessionQuestions');
-            if (stored) {
-                const arr = JSON.parse(stored);
-                setIsAdded(arr.includes(questionId));
+                    setShowAnswer(true);
+                    break;
+                case 'ArrowUp':
+                    e.preventDefault();
+                    setShowAnswer(false);
+                    break;
             }
         };
-        window.addEventListener('storage', sync);
-        return () => window.removeEventListener('storage', sync);
-    }, [questionId]);
 
-    const handleToggle = () => {
-        let arr = [];
-        if (typeof window !== 'undefined') {
-            const stored = localStorage.getItem('practiceSessionQuestions');
-            if (stored) arr = JSON.parse(stored);
-            if (isAdded) {
-                arr = arr.filter(id => id !== questionId);
-            } else {
-                arr.push(questionId);
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [questions, currentQuestionIndex, showAnswer]);
+
+    const handleKeyDown = (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            if (inputValue.trim()) {
+                // Add new tag
+                const newTag = inputValue.trim();
+                if (!enteredTags.includes(newTag)) {
+                    setEnteredTags(prev => [...prev, newTag]);
+                    setInputValue(''); // Clear input after adding tag
+                }
             }
-            localStorage.setItem('practiceSessionQuestions', JSON.stringify(arr));
-            setIsAdded(!isAdded);
         }
     };
 
+    const fetchQuestions = async (tags) => {
+        if (!tags || tags.length === 0) return;
+        
+        setLoading(true);
+        setError(null);
+        setHasSearched(true);
+        setCurrentQuestionIndex(0);
+        setShowAnswer(false);
+        
+        try {
+            const tagsString = tags.join(', ');
+            const url = `http://127.0.0.1:5000/api/questions?user_id=default_user&tags=${encodeURIComponent(tagsString)}`;
+            
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            setQuestions(data);
+        } catch (err) {
+            setError(err.message);
+            setQuestions([]);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+
+
+    const loadAnswerForQuestion = async (question) => {
+        if (questionAnswers[question.id]) return; // Already loaded
+
+        try {
+            const response = await fetch(`http://127.0.0.1:5000/api/questions_by_ids?ids=${question.id}`);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            if (data.length > 0) {
+                setQuestionAnswers(prev => ({
+                    ...prev,
+                    [question.id]: data[0].answer_image
+                }));
+            }
+        } catch (err) {
+            console.error('Error loading answer:', err);
+        }
+    };
+
+    const handleManualSearch = () => {
+        if (enteredTags.length > 0) {
+            fetchQuestions(enteredTags);
+        }
+    };
+
+    const removeTag = (indexToRemove) => {
+        const newTags = enteredTags.filter((_, index) => index !== indexToRemove);
+        setEnteredTags(newTags);
+        
+        // If we have questions and tags change, re-search
+        if (hasSearched && newTags.length > 0) {
+            fetchQuestions(newTags);
+        } else if (newTags.length === 0) {
+            setQuestions([]);
+            setHasSearched(false);
+        }
+    };
+
+    const markQuestionAsSolved = async (questionId) => {
+        try {
+            const response = await fetch(`http://127.0.0.1:5000/api/questions/${questionId}/complete`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ user_id: 'default_user' })
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            // Update the current question's last solved text
+            setQuestions(prev => prev.map(q => 
+                q.id === questionId 
+                    ? { ...q, last_solved_text: 'Today' }
+                    : q
+            ));
+        } catch (err) {
+            console.error('Error marking question as solved:', err);
+        }
+    };
+
+
+
+    const currentQuestion = questions[currentQuestionIndex];
+
     return (
-        <div className="flex items-center gap-3">
-            <button 
-                onClick={handleToggle}
-                className="relative inline-flex h-12 overflow-hidden rounded-full p-[1px] focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2 focus:ring-offset-slate-50"
-            >
-                <span className="absolute inset-[-1000%] animate-[spin_2s_linear_infinite] bg-[conic-gradient(from_90deg_at_50%_50%,#E2CBFF_0%,#393BB2_50%,#E2CBFF_100%)]" />
-                <span className="inline-flex h-full w-full cursor-pointer items-center justify-center rounded-full px-4 py-1 text-sm font-medium bg-slate-950 text-white backdrop-blur-3xl">
-                    {isAdded ? "Remove from practice session" : "Add to practice session"}
-                </span>
-            </button>
-            {/* Green tick animation */}
-            <motion.div
-                initial={{ scale: 0, opacity: 0 }}
-                animate={{ 
-                    scale: isAdded ? 1 : 0, 
-                    opacity: isAdded ? 1 : 0 
-                }}
-                transition={{ 
-                    type: "spring", 
-                    stiffness: 500, 
-                    damping: 30 
-                }}
-                className="flex items-center justify-center w-8 h-8 bg-green-500 rounded-full"
-            >
-                <svg 
-                    className="w-5 h-5 text-white" 
-                    fill="none" 
-                    stroke="currentColor" 
-                    viewBox="0 0 24 24"
-                >
-                    <motion.path
-                        initial={{ pathLength: 0 }}
-                        animate={{ pathLength: isAdded ? 1 : 0 }}
-                        transition={{ duration: 0.3, delay: 0.1 }}
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M5 13l4 4L19 7"
-                    />
-                </svg>
-            </motion.div>
+        <div className="flex-1 flex flex-col h-full overflow-hidden">
+            {/* Search Container - Always visible */}
+            <div className="sticky top-0 w-full bg-white/95 dark:bg-black/95 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800 z-50 px-8 py-4">
+                 <div className="flex items-start gap-4 max-w-6xl mx-auto">
+                {/* Last solved info - Fixed width */}
+                <div className="flex-shrink-0 w-48">
+                    {currentQuestion && currentQuestion.last_solved_text && (
+                        <div className="bg-gray-50 dark:bg-gray-800 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700">
+                            <span className="text-xs text-gray-600 dark:text-gray-400">Last solved:</span>
+                            <span className="text-sm font-medium text-gray-800 dark:text-gray-200 ml-1">
+                                {currentQuestion.last_solved_text}
+                            </span>
+                        </div>
+                    )}
+                </div>
+                               
+                <div className="flex-1 relative">
+                    
+                    
+                    {/* Main search input */}
+                    <div className="relative">
+                        <input
+                            type="text"
+                            value={inputValue}
+                            onChange={(e) => setInputValue(e.target.value)}
+                            onKeyDown={handleKeyDown}
+                            placeholder="Type a tag and press Enter to add it..."
+                            className="w-full h-12 px-6 pr-16 rounded-xl bg-white dark:bg-zinc-800 text-sm text-neutral-900 dark:text-white placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 border-2 border-neutral-200 dark:border-neutral-700 transition-all duration-300 shadow-sm hover:shadow-md"
+                        />
+                        
+                        {/* Search button */}
+                        <button
+                            onClick={handleManualSearch}
+                            className={`absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg transition-all duration-300 ${
+                                enteredTags.length === 0 
+                                    ? 'bg-neutral-100 dark:bg-neutral-700 text-neutral-400' 
+                                    : 'bg-blue-500 hover:bg-blue-600 text-white shadow-md hover:shadow-blue-500/25'
+                            }`}
+                            disabled={enteredTags.length === 0}
+                        >
+                            <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                className="h-3 w-3"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                            >
+                                <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                                />
+                            </svg>
+                        </button>
+                    </div>
+
+                    {/* Tags display */}
+                    {enteredTags.length > 0 && (
+                        <div className="mt-4">
+                            
+                            <div className="flex flex-wrap gap-2">
+                                {enteredTags.map((tag, index) => (
+                                    <div
+                                        key={index}
+                                        className="flex items-center gap-2 bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/30 text-blue-700 dark:text-blue-300 px-3 py-1.5 rounded-full text-sm font-medium border border-blue-200 dark:border-blue-700/50 shadow-sm hover:shadow-md transition-all duration-200"
+                                    >
+                                        <span className="flex items-center gap-1">
+                                            <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
+                                                <path fillRule="evenodd" d="M17.707 9.293a1 1 0 010 1.414l-7 7a1 1 0 01-1.414 0l-7-7A.997.997 0 012 10V5a3 3 0 013-3h5c.256 0 .512.098.707.293l7 7zM5 6a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+                                            </svg>
+                                            {tag}
+                                        </span>
+                                        <button
+                                            onClick={() => removeTag(index)}
+                                            className="ml-1 p-1 hover:bg-red-100 dark:hover:bg-red-900/30 hover:text-red-600 dark:hover:text-red-400 rounded-full transition-all duration-200"
+                                        >
+                                            <svg
+                                                xmlns="http://www.w3.org/2000/svg"
+                                                className="h-3 w-3"
+                                                viewBox="0 0 20 20"
+                                                fill="currentColor"
+                                            >
+                                                <path
+                                                    fillRule="evenodd"
+                                                    d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                                                    clipRule="evenodd"
+                                                />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+                    
+                </div>
+                
+            </div>
+
+            {/* Question Display Section */}
+            <div className="flex-1 overflow-hidden">
+                {loading && (
+                    <div className="flex items-center justify-center h-full">
+                        <div className="flex items-center gap-3">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                            <span className="text-lg text-neutral-600 dark:text-neutral-400">
+                                Searching questions...
+                            </span>
+                        </div>
+                    </div>
+                )}
+
+                {error && (
+                    <div className="flex items-center justify-center h-full">
+                        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-6 max-w-md">
+                            <div className="flex items-center gap-3">
+                                <svg className="h-6 w-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                <div>
+                                    <h3 className="font-medium text-red-800 dark:text-red-200">Error</h3>
+                                    <p className="text-sm text-red-600 dark:text-red-300 mt-1">{error}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {!loading && !error && hasSearched && questions.length === 0 && (
+                    <div className="flex items-center justify-center h-full">
+                        <div className="text-center">
+                            <svg className="h-16 w-16 text-neutral-300 dark:text-neutral-600 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                            <h3 className="text-lg font-medium text-neutral-600 dark:text-neutral-300 mb-2">
+                                No questions found
+                            </h3>
+                            <p className="text-neutral-500 dark:text-neutral-400">
+                                Try different tags or check your spelling
+                            </p>
+                        </div>
+                    </div>
+                )}
+
+                {!loading && !error && questions.length > 0 && currentQuestion && (
+                    <div className="h-full flex flex-col p-6">
+                        {/* Question navigation header */}
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="flex flex-col">
+                                <span className="text-sm text-neutral-600 dark:text-neutral-400">
+                                    Question {currentQuestionIndex + 1} of {questions.length}
+                                </span>
+                                <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => markQuestionAsSolved(currentQuestion.id)}
+                                    className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg transition-colors duration-200 flex items-center gap-2"
+                                >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                    </svg>
+                                    Mark as Solved
+                                </button>
+                            </div>
+                                {/* {currentQuestion.last_solved_text && (
+                                    <span className="text-xs text-neutral-500 dark:text-neutral-500">
+                                        Last solved: {currentQuestion.last_solved_text}
+                                    </span>
+                                )} */}
+                            </div>
+                            
+                            <div className="flex items-center gap-2">
+                                {/* <button
+                                    onClick={() => {
+                                        setCurrentQuestionIndex(prev => 
+                                            prev > 0 ? prev - 1 : questions.length - 1
+                                        );
+                                        setShowAnswer(false);
+                                    }}
+                                    className="p-2 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700"
+                                >
+                                    ←
+                                </button> */}
+                                {/* <button
+                                    onClick={() => {
+                                        if (!showAnswer) {
+                                            loadAnswerForQuestion(currentQuestion);
+                                        }
+                                        setShowAnswer(!showAnswer);
+                                    }}
+                                    className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg"
+                                >
+                                    {showAnswer ? 'Hide Answer' : 'Show Answer'}
+                                </button> */}
+                                {/* <button
+                                    onClick={() => {
+                                        setCurrentQuestionIndex(prev => 
+                                            prev < questions.length - 1 ? prev + 1 : 0
+                                        );
+                                        setShowAnswer(false);
+                                    }}
+                                    className="p-2 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700"
+                                >
+                                    →
+                                </button> */}
+                            </div>
+                        </div>
+
+                        {/* Question/Answer Display */}
+                        <div className="flex-1 flex flex-col justify-center">
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-full">
+                                {/* Question */}
+                                <div className="flex flex-col">
+                                    {/* <h3 className="text-lg font-semibold mb-3 text-center">Question</h3> */}
+                                    <div className="flex-1 flex items-center justify-center bg-white dark:bg-zinc-800 rounded-xl border border-neutral-200 dark:border-neutral-700 p-4">
+                                        <img
+                                            src={`http://127.0.0.1:5000${currentQuestion.question_image}`}
+                                            alt={`Question ${currentQuestion.id}`}
+                                            className="max-w-full max-h-full object-contain"
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Answer */}
+                                <div className="flex flex-col">
+                                    {/* <h3 className="text-lg font-semibold mb-3 text-center">Answer</h3> */}
+                                    <div className="flex-1 flex items-center justify-center bg-white dark:bg-zinc-800 rounded-xl border border-neutral-200 dark:border-neutral-700 p-4">
+                                        {showAnswer && questionAnswers[currentQuestion.id] ? (
+                                            <img
+                                                src={`http://127.0.0.1:5000${questionAnswers[currentQuestion.id]}`}
+                                                alt={`Answer ${currentQuestion.id}`}
+                                                className="max-w-full max-h-full object-contain"
+                                            />
+                                        ) : (
+                                            <div className="text-center text-neutral-500 dark:text-neutral-400">
+                                                {showAnswer ? 'Loading answer...' : 'Press "Show Answer" or ↓ to reveal'}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Navigation hints */}
+                        <div className="mt-4 text-center text-sm text-neutral-500 dark:text-neutral-400">
+                            Use ← → arrow keys to navigate questions • ↓ ↑ to show/hide answers
+                        </div>
+                    </div>
+                )}
+
+                {!hasSearched && (
+                    <div className="flex items-center justify-center h-full">
+                        <div className="text-center">
+                            <svg className="h-16 w-16 text-neutral-300 dark:text-neutral-600 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                            </svg>
+                            <h3 className="text-lg font-medium text-neutral-600 dark:text-neutral-300 mb-2">
+                                Start exploring questions
+                            </h3>
+                            <p className="text-neutral-500 dark:text-neutral-400">
+                                Add multiple tags above and click search to find relevant questions
+                            </p>
+                        </div>
+                    </div>
+                )}
+            </div>
         </div>
     );
 };

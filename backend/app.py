@@ -4,6 +4,7 @@ import mysql.connector
 import bcrypt
 import os
 import time
+from datetime import datetime
 
 app = Flask(__name__)
 # CORS(app)
@@ -192,29 +193,47 @@ def get_questions():
             db.close()
             return jsonify([])
 
+        # For logical AND, we need questions that have ALL the specified tags
         placeholders = ','.join(['%s'] * len(tags))
         query = f"""
-            SELECT DISTINCT q.id, q.question_image
+            SELECT 
+                q.id, 
+                q.question_image,
+                MAX(uqh.completed_at) as last_solved_at,
+                CASE 
+                    WHEN MAX(uqh.completed_at) IS NULL THEN 'Never solved'
+                    ELSE CONCAT(
+                        TIMESTAMPDIFF(DAY, MAX(uqh.completed_at), NOW()), 
+                        ' days ago'
+                    )
+                END as last_solved_text
             FROM questions q
             JOIN question_tags qt ON q.id = qt.question_id
             JOIN tags t ON qt.tag_id = t.id
-            LEFT JOIN user_question_history uqh ON q.id = uqh.question_id 
-                AND uqh.user_id = %s 
-                AND uqh.completed_at > DATE_SUB(NOW(), INTERVAL 7 DAY)
+            LEFT JOIN user_question_history uqh ON q.id = uqh.question_id AND uqh.user_id = %s
             WHERE t.name IN ({placeholders})
-                AND uqh.id IS NULL
+            GROUP BY q.id, q.question_image
+            HAVING COUNT(DISTINCT t.name) = %s
             ORDER BY q.id DESC
             LIMIT %s
         """
-        cursor.execute(query, (user_id, *tags, limit))
+        cursor.execute(query, (user_id, *tags, len(tags), limit))
     else:
         query = """
-            SELECT DISTINCT q.id, q.question_image
+            SELECT 
+                q.id, 
+                q.question_image,
+                MAX(uqh.completed_at) as last_solved_at,
+                CASE 
+                    WHEN MAX(uqh.completed_at) IS NULL THEN 'Never solved'
+                    ELSE CONCAT(
+                        TIMESTAMPDIFF(DAY, MAX(uqh.completed_at), NOW()), 
+                        ' days ago'
+                    )
+                END as last_solved_text
             FROM questions q
-            LEFT JOIN user_question_history uqh ON q.id = uqh.question_id 
-                AND uqh.user_id = %s 
-                AND uqh.completed_at > DATE_SUB(NOW(), INTERVAL 7 DAY)
-            WHERE uqh.id IS NULL
+            LEFT JOIN user_question_history uqh ON q.id = uqh.question_id AND uqh.user_id = %s
+            GROUP BY q.id, q.question_image
             ORDER BY q.id DESC
             LIMIT %s
         """
@@ -226,34 +245,54 @@ def get_questions():
 
     for q in questions:
         q['question_image'] = '/' + q['question_image'] if not q['question_image'].startswith('/') else q['question_image']
+        
+        # Handle the case where last_solved_at might be 0 days
+        if q['last_solved_at'] is not None:
+            days_diff = (datetime.now() - q['last_solved_at']).days
+            if days_diff == 0:
+                q['last_solved_text'] = 'Today'
+            elif days_diff == 1:
+                q['last_solved_text'] = '1 day ago'
+            else:
+                q['last_solved_text'] = f'{days_diff} days ago'
+        else:
+            q['last_solved_text'] = 'Never solved'
+    
     return jsonify(questions)
+
+
 
 @app.route('/api/questions/<int:question_id>/complete', methods=['POST'])
 def mark_question_complete(question_id):
-    user_id = request.json.get('user_id', 'default_user')
+    data = request.get_json()
+    user_id = data.get('user_id', 'default_user')
     
+    # Create a new connection for this request
     db = mysql.connector.connect(
         host="localhost",
-        user="root",
-        password="hi",
+        user=DB_USER,
+        password=DB_PASSWORD,
         database="qnahub"
     )
     cursor = db.cursor(dictionary=True)
     
     try:
+        # Insert or update the user_question_history table
         cursor.execute("""
-            INSERT INTO user_question_history (user_id, question_id)
-            VALUES (%s, %s)
+            INSERT INTO user_question_history (user_id, question_id, completed_at)
+            VALUES (%s, %s, NOW())
+            ON DUPLICATE KEY UPDATE completed_at = NOW()
         """, (user_id, question_id))
+        
         db.commit()
         cursor.close()
         db.close()
-        return jsonify({'success': True})
+        
+        return jsonify({"message": "Question marked as completed", "success": True})
     except Exception as e:
         cursor.close()
         db.close()
-        return jsonify({'error': str(e)}), 500
-    
+        return jsonify({"error": str(e)}), 500  
 
 @app.route('/api/questions_by_ids', methods=['GET'])
 def get_questions_by_ids():

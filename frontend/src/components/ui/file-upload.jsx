@@ -1,6 +1,6 @@
 import React, { useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Upload } from "lucide-react";
+import { Upload, Clipboard } from "lucide-react";
 
 const mainVariant = {
   initial: {
@@ -28,12 +28,14 @@ function cn(...classes) {
   return classes.filter(Boolean).join(' ');
 }
 
+// ...existing code...
 export const FileUpload = ({
   onChange,
   id = "default"
 }) => {
   const [files, setFiles] = useState([]);
   const [isDragActive, setIsDragActive] = useState(false);
+  const [isPasting, setIsPasting] = useState(false);
   const fileInputRef = useRef(null);
   const containerRef = useRef(null); 
 
@@ -62,6 +64,42 @@ export const FileUpload = ({
     
     if (pastedFiles.length > 0) {
       handleFileChange(pastedFiles);
+    }
+  };
+
+  const handlePasteFromClipboard = async () => {
+    setIsPasting(true);
+    try {
+      const clipboardItems = await navigator.clipboard.read();
+      const pastedFiles = [];
+
+      for (const clipboardItem of clipboardItems) {
+        for (const type of clipboardItem.types) {
+          if (type.startsWith('image/')) {
+            const blob = await clipboardItem.getType(type);
+            // Create a file from the blob with a proper name
+            const file = new File([blob], `pasted-image-${Date.now()}.${type.split('/')[1]}`, {
+              type: type,
+              lastModified: Date.now()
+            });
+            pastedFiles.push(file);
+          }
+        }
+      }
+
+      if (pastedFiles.length > 0) {
+        handleFileChange(pastedFiles);
+      } else {
+        console.log('No image files found in clipboard');
+      }
+    } catch (error) {
+      console.error('Failed to read clipboard:', error);
+      // Fallback: focus the container to enable paste event
+      if (containerRef.current) {
+        containerRef.current.focus();
+      }
+    } finally {
+      setIsPasting(false);
     }
   };
 
@@ -106,9 +144,8 @@ export const FileUpload = ({
       style={{ outline: 'none' }}
     >
       <motion.div
-        onClick={handleClick}
         whileHover="animate"
-        className="p-10 group/file block rounded-lg cursor-pointer w-full relative overflow-hidden">
+        className="p-10 group/file block rounded-lg w-full relative overflow-hidden">
         <input
           ref={fileInputRef}
           id="file-upload-handle"
@@ -132,6 +169,17 @@ export const FileUpload = ({
             className="relative z-20 font-sans font-normal text-blue-400 dark:text-blue-300 text-sm mt-1">
             You can also paste screenshots here (Cmd+V)
           </p>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handlePasteFromClipboard();
+            }}
+            disabled={isPasting}
+            className="relative z-20 mt-3 px-4 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-blue-300 text-white text-sm font-medium rounded-md transition-colors duration-200 flex items-center gap-2"
+          >
+            <Clipboard className="h-4 w-4" />
+            {isPasting ? 'Pasting...' : 'Paste from Clipboard'}
+          </button>
           <div className="relative w-full mt-10 max-w-xl mx-auto">
             {files.length > 0 &&
               files.map((file, idx) => (
@@ -178,6 +226,7 @@ export const FileUpload = ({
               ))}
             {!files.length && (
               <motion.div
+                onClick={handleClick}
                 layoutId={`file-upload-${id}`}
                 variants={mainVariant}
                 transition={{
@@ -186,7 +235,7 @@ export const FileUpload = ({
                   damping: 20,
                 }}
                 className={cn(
-                  "relative group-hover/file:shadow-2xl z-40 bg-white dark:bg-neutral-900 flex items-center justify-center h-32 mt-4 w-full max-w-[8rem] mx-auto rounded-md",
+                  "relative group-hover/file:shadow-2xl z-40 bg-white dark:bg-neutral-900 flex items-center justify-center h-32 mt-4 w-full max-w-[8rem] mx-auto rounded-md cursor-pointer",
                   "shadow-[0px_10px_50px_rgba(0,0,0,0.1)]"
                 )}>
                 {isDragActive ? (
@@ -214,6 +263,8 @@ export const FileUpload = ({
     </div>
   );
 };
+// ...existing code...
+// ...existing code...
 
 export function GridPattern() {
   const columns = 41;

@@ -10,6 +10,7 @@ export function PlaceholdersAndVanishInput({
   onSubmit
 }) {
   const [currentPlaceholder, setCurrentPlaceholder] = useState(0);
+  const [tags, setTags] = useState([]);
 
   const intervalRef = useRef(null);
   const startAnimation = () => {
@@ -25,6 +26,8 @@ export function PlaceholdersAndVanishInput({
       startAnimation(); // Restart the interval when the tab becomes visible
     }
   };
+
+  
 
   useEffect(() => {
     startAnimation();
@@ -146,9 +149,29 @@ export function PlaceholdersAndVanishInput({
   };
 
   const handleKeyDown = (e) => {
-    if (e.key === "Enter" && !animating) {
+    if (e.key === "Tab" && !animating && value.trim()) {
+      e.preventDefault(); // Prevent focus change
+      setTags(prev => [...prev, value.trim()]);
       vanishAndSubmit();
+    } else if (e.key === "Enter" && !animating) {
+      e.preventDefault();
+      if (tags.length > 0) {
+        vanishAndSubmit();
+        onSubmit && onSubmit(tags); // Send all tags to parent
+        setTags([]); // Clear tags after submission
+      } else if (value.trim()) {
+        // If no tags but there's a value, add it as a tag and submit
+        const newTags = [value.trim()];
+        setTags(newTags);
+        vanishAndSubmit();
+        onSubmit && onSubmit(newTags);
+        setTags([]);
+      }
     }
+  };
+
+  const removeTag = (tagToRemove) => {
+    setTags(prev => prev.filter(tag => tag !== tagToRemove));
   };
 
   const vanishAndSubmit = () => {
@@ -168,12 +191,20 @@ export function PlaceholdersAndVanishInput({
     onSubmit && onSubmit(e);
   };
   return (
+     <div className="w-full">
     <form
       className={cn(
-        "w-full relative max-w-xl mx-auto bg-white dark:bg-zinc-800 h-12 rounded-full overflow-hidden shadow-[0px_2px_3px_-1px_rgba(0,0,0,0.1),_0px_1px_0px_0px_rgba(25,28,33,0.02),_0px_0px_0px_1px_rgba(25,28,33,0.08)] transition duration-200",
+        "w-full relative mx-auto bg-white dark:bg-zinc-800 h-12 rounded-full overflow-hidden shadow-[0px_2px_3px_-1px_rgba(0,0,0,0.1),_0px_1px_0px_0px_rgba(25,28,33,0.02),_0px_0px_0px_1px_rgba(25,28,33,0.08)] transition duration-200",
         value && "bg-gray-50"
       )}
-      onSubmit={handleSubmit}>
+      onSubmit={(e) => {
+          e.preventDefault();
+          if (tags.length > 0) {
+            vanishAndSubmit();
+            onSubmit && onSubmit(tags);
+            setTags([]);
+          }
+        }}>
       <canvas
         className={cn(
           "absolute pointer-events-none  text-base transform scale-50 top-[20%] left-2 sm:left-8 origin-top-left filter invert dark:invert-0 pr-20",
@@ -257,5 +288,37 @@ export function PlaceholdersAndVanishInput({
         </AnimatePresence>
       </div>
     </form>
+
+    {tags.length > 0 && (
+        <div className="flex flex-wrap gap-2 mt-3 px-4">
+          {tags.map((tag, index) => (
+            <div
+              key={index}
+              className="flex items-center gap-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-3 py-1 rounded-full text-sm"
+            >
+              {tag}
+              <button
+                onClick={() => removeTag(tag)}
+                className="ml-1 hover:text-blue-900 dark:hover:text-blue-100 transition-colors"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-4 w-4"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      
+    </div>
   );
 }
