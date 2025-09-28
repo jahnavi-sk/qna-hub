@@ -175,6 +175,7 @@ def upload_question():
 def get_questions():
     tags_param = request.args.get('tags')
     user_id = request.args.get('user_id', 'default_user')
+    unsolved_only = request.args.get('unsolved_only', 'false').lower() == 'true'
     limit = 50
 
     # Create a new connection for this request
@@ -195,49 +196,85 @@ def get_questions():
 
         # For logical AND, we need questions that have ALL the specified tags
         placeholders = ','.join(['%s'] * len(tags))
-        query = f"""
-            SELECT 
-                q.id, 
-                q.question_image,
-                MAX(uqh.completed_at) as last_solved_at,
-                CASE 
-                    WHEN MAX(uqh.completed_at) IS NULL THEN 'Never solved'
-                    ELSE CONCAT(
-                        TIMESTAMPDIFF(DAY, MAX(uqh.completed_at), NOW()), 
-                        ' days ago'
-                    )
-                END as last_solved_text
-            FROM questions q
-            JOIN question_tags qt ON q.id = qt.question_id
-            JOIN tags t ON qt.tag_id = t.id
-            LEFT JOIN user_question_history uqh ON q.id = uqh.question_id AND uqh.user_id = %s
-            WHERE t.name IN ({placeholders})
-            GROUP BY q.id, q.question_image
-            HAVING COUNT(DISTINCT t.name) = %s
-            ORDER BY q.id DESC
-            LIMIT %s
-        """
-        cursor.execute(query, (user_id, *tags, len(tags), limit))
+        
+        if unsolved_only:
+            query = f"""
+                SELECT 
+                    q.id, 
+                    q.question_image,
+                    MAX(uqh.completed_at) as last_solved_at,
+                    'Never solved' as last_solved_text
+                FROM questions q
+                JOIN question_tags qt ON q.id = qt.question_id
+                JOIN tags t ON qt.tag_id = t.id
+                LEFT JOIN user_question_history uqh ON q.id = uqh.question_id AND uqh.user_id = %s
+                WHERE t.name IN ({placeholders})
+                GROUP BY q.id, q.question_image
+                HAVING COUNT(DISTINCT t.name) = %s AND MAX(uqh.completed_at) IS NULL
+                ORDER BY q.id DESC
+                LIMIT %s
+            """
+            cursor.execute(query, (user_id, *tags, len(tags), limit))
+        else:
+            query = f"""
+                SELECT 
+                    q.id, 
+                    q.question_image,
+                    MAX(uqh.completed_at) as last_solved_at,
+                    CASE 
+                        WHEN MAX(uqh.completed_at) IS NULL THEN 'Never solved'
+                        ELSE CONCAT(
+                            TIMESTAMPDIFF(DAY, MAX(uqh.completed_at), NOW()), 
+                            ' days ago'
+                        )
+                    END as last_solved_text
+                FROM questions q
+                JOIN question_tags qt ON q.id = qt.question_id
+                JOIN tags t ON qt.tag_id = t.id
+                LEFT JOIN user_question_history uqh ON q.id = uqh.question_id AND uqh.user_id = %s
+                WHERE t.name IN ({placeholders})
+                GROUP BY q.id, q.question_image
+                HAVING COUNT(DISTINCT t.name) = %s
+                ORDER BY q.id DESC
+                LIMIT %s
+            """
+            cursor.execute(query, (user_id, *tags, len(tags), limit))
     else:
-        query = """
-            SELECT 
-                q.id, 
-                q.question_image,
-                MAX(uqh.completed_at) as last_solved_at,
-                CASE 
-                    WHEN MAX(uqh.completed_at) IS NULL THEN 'Never solved'
-                    ELSE CONCAT(
-                        TIMESTAMPDIFF(DAY, MAX(uqh.completed_at), NOW()), 
-                        ' days ago'
-                    )
-                END as last_solved_text
-            FROM questions q
-            LEFT JOIN user_question_history uqh ON q.id = uqh.question_id AND uqh.user_id = %s
-            GROUP BY q.id, q.question_image
-            ORDER BY q.id DESC
-            LIMIT %s
-        """
-        cursor.execute(query, (user_id, limit))
+        if unsolved_only:
+            query = """
+                SELECT 
+                    q.id, 
+                    q.question_image,
+                    MAX(uqh.completed_at) as last_solved_at,
+                    'Never solved' as last_solved_text
+                FROM questions q
+                LEFT JOIN user_question_history uqh ON q.id = uqh.question_id AND uqh.user_id = %s
+                GROUP BY q.id, q.question_image
+                HAVING MAX(uqh.completed_at) IS NULL
+                ORDER BY q.id DESC
+                LIMIT %s
+            """
+            cursor.execute(query, (user_id, limit))
+        else:
+            query = """
+                SELECT 
+                    q.id, 
+                    q.question_image,
+                    MAX(uqh.completed_at) as last_solved_at,
+                    CASE 
+                        WHEN MAX(uqh.completed_at) IS NULL THEN 'Never solved'
+                        ELSE CONCAT(
+                            TIMESTAMPDIFF(DAY, MAX(uqh.completed_at), NOW()), 
+                            ' days ago'
+                        )
+                    END as last_solved_text
+                FROM questions q
+                LEFT JOIN user_question_history uqh ON q.id = uqh.question_id AND uqh.user_id = %s
+                GROUP BY q.id, q.question_image
+                ORDER BY q.id DESC
+                LIMIT %s
+            """
+            cursor.execute(query, (user_id, limit))
 
     questions = cursor.fetchall()
     cursor.close()
@@ -259,8 +296,6 @@ def get_questions():
             q['last_solved_text'] = 'Never solved'
     
     return jsonify(questions)
-
-
 
 @app.route('/api/questions/<int:question_id>/complete', methods=['POST'])
 def mark_question_complete(question_id):
@@ -310,7 +345,7 @@ def get_questions_by_ids():
     db = mysql.connector.connect(
         host="localhost",
         user="root",
-        password="hi",
+        password=DB_PASSWORD,
         database="qnahub"
     )
     cursor = db.cursor(dictionary=True)
@@ -340,7 +375,7 @@ def get_completed_questions():
     db = mysql.connector.connect(
         host="localhost",
         user="root",
-        password="hi",
+        password=DB_PASSWORD,
         database="qnahub"
     )
     cursor = db.cursor(dictionary=True)

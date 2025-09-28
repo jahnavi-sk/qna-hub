@@ -81,21 +81,21 @@ export default function AdminLand(){
       localStorage.setItem('recentTags', JSON.stringify(updatedRecentTags));
     };
 
-    useEffect(() => {
-      // console.log("in here");
-    fetch("http://127.0.0.1:5000/api/questions")
-      .then(res => res.json())
-      .then(data => {
-        console.log(data);
-        // Format tags as a string for display
-        setTestimonials(
-          data.map(q => ({
-            question: `http://127.0.0.1:5000${q.question_image}`, // This is the image path
-            tags: q.tags || ""
-          }))
-        );
-      });
-  }, []);
+  //   useEffect(() => {
+  //     // console.log("in here");
+  //   fetch("http://127.0.0.1:5000/api/questions")
+  //     .then(res => res.json())
+  //     .then(data => {
+  //       console.log(data);
+  //       // Format tags as a string for display
+  //       setTestimonials(
+  //         data.map(q => ({
+  //           question: `http://127.0.0.1:5000${q.question_image}`, // This is the image path
+  //           tags: q.tags || ""
+  //         }))
+  //       );
+  //     });
+  // }, []);
 
     const handleAddQuestions = () => {
         setShowUpload(true);

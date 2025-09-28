@@ -119,6 +119,9 @@ const Dashboard = () => {
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
     const [showAnswer, setShowAnswer] = useState(false);
     const [questionAnswers, setQuestionAnswers] = useState({});
+    const [unsolvedOnly, setUnsolvedOnly] = useState(false); // New state for filter
+
+    const BACKEND_URL = 'http://127.0.0.1:5000/';
 
     // Keyboard navigation
     useEffect(() => {
@@ -175,7 +178,7 @@ const Dashboard = () => {
         }
     };
 
-    const fetchQuestions = async (tags) => {
+    const fetchQuestions = async (tags,filterUnsolved = unsolvedOnly) => {
         if (!tags || tags.length === 0) return;
         
         setLoading(true);
@@ -186,7 +189,7 @@ const Dashboard = () => {
         
         try {
             const tagsString = tags.join(', ');
-            const url = `http://127.0.0.1:5000/api/questions?user_id=default_user&tags=${encodeURIComponent(tagsString)}`;
+            const url = `${BACKEND_URL}api/questions?user_id=default_user&tags=${encodeURIComponent(tagsString)}&unsolved_only=${filterUnsolved}`;
             
             const response = await fetch(url);
             if (!response.ok) {
@@ -209,7 +212,7 @@ const Dashboard = () => {
         if (questionAnswers[question.id]) return; // Already loaded
 
         try {
-            const response = await fetch(`http://127.0.0.1:5000/api/questions_by_ids?ids=${question.id}`);
+            const response = await fetch(`${BACKEND_URL}api/questions_by_ids?ids=${question.id}`);
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
@@ -245,9 +248,18 @@ const Dashboard = () => {
         }
     };
 
+    const handleFilterChange = (filterValue) => {
+        setUnsolvedOnly(filterValue);
+        // If we have tags, re-search with the new filter
+        if (enteredTags.length > 0) {
+            fetchQuestions(enteredTags, filterValue);
+        }
+    };
+
+    
     const markQuestionAsSolved = async (questionId) => {
         try {
-            const response = await fetch(`http://127.0.0.1:5000/api/questions/${questionId}/complete`, {
+            const response = await fetch(`${BACKEND_URL}api/questions/${questionId}/complete`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -289,6 +301,36 @@ const Dashboard = () => {
                             </span>
                         </div>
                     )}
+
+                    {/* Filter Options */}
+                        <div className="mt-3">
+                            <div className="text-xs text-gray-600 dark:text-gray-400 mb-2">Filter:</div>
+                            <div className="space-y-2">
+                                <label className="flex items-center cursor-pointer">
+                                    <input
+                                        type="radio"
+                                        name="questionFilter"
+                                        checked={!unsolvedOnly}
+                                        onChange={() => handleFilterChange(false)}
+                                        className="w-3 h-3 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                                    />
+                                    <span className="ml-2 text-xs text-gray-700 dark:text-gray-300">All Questions</span>
+                                </label>
+                                <label className="flex items-center cursor-pointer">
+                                    <input
+                                        type="radio"
+                                        name="questionFilter"
+                                        checked={unsolvedOnly}
+                                        onChange={() => handleFilterChange(true)}
+                                        className="w-3 h-3 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                                    />
+                                    <span className="ml-2 text-xs text-gray-700 dark:text-gray-300">Unsolved Only</span>
+                                </label>
+                            </div>
+                        </div>
+
+
+
                 </div>
                                
                 <div className="flex-1 relative">
@@ -492,7 +534,7 @@ const Dashboard = () => {
                                     {/* <h3 className="text-lg font-semibold mb-3 text-center">Question</h3> */}
                                     <div className="flex-1 flex items-center justify-center bg-white dark:bg-zinc-800 rounded-xl border border-neutral-200 dark:border-neutral-700 p-4">
                                         <img
-                                            src={`http://127.0.0.1:5000${currentQuestion.question_image}`}
+                                            src={`${BACKEND_URL}${currentQuestion.question_image}`}
                                             alt={`Question ${currentQuestion.id}`}
                                             className="max-w-full max-h-full object-contain"
                                         />
