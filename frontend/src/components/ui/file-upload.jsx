@@ -40,8 +40,15 @@ export const FileUpload = ({
   const containerRef = useRef(null); 
 
   const handleFileChange = (newFiles) => {
-    setFiles((prevFiles) => [...prevFiles, ...newFiles]);
-    onChange && onChange(newFiles);
+    // Merge new files with existing, avoiding duplicates by name
+  const mergedFiles = [...files, ...newFiles].reduce((acc, file) => {
+    if (!acc.some(f => f.name === file.name && f.size === file.size)) {
+      acc.push(file);
+    }
+    return acc;
+  }, []);
+  setFiles(mergedFiles);
+  onChange && onChange(mergedFiles);
   };
 
   const handlePaste = (e) => {
@@ -150,6 +157,7 @@ export const FileUpload = ({
           ref={fileInputRef}
           id="file-upload-handle"
           type="file"
+          multiple
           onChange={(e) => handleFileChange(Array.from(e.target.files || []))}
           className="hidden" />
         <div

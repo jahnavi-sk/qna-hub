@@ -117,7 +117,9 @@ const Dashboard = () => {
     const [error, setError] = useState(null);
     const [hasSearched, setHasSearched] = useState(false);
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-    const [showAnswer, setShowAnswer] = useState(false);
+    const [currentAnswerIndex, setCurrentAnswerIndex] = useState(-1); // Add this for multiple answers
+    // const [showAnswer, setShowAnswer] = useState(false);
+    
     const [questionAnswers, setQuestionAnswers] = useState({});
     const [unsolvedOnly, setUnsolvedOnly] = useState(false); // New state for filter
 
@@ -131,38 +133,52 @@ const Dashboard = () => {
             
             if (questions.length === 0) return;
             
+            const currentQuestion = questions[currentQuestionIndex];
+            const answerImages = questionAnswers[currentQuestion?.id]?.answer_images || [];
+            
             switch(e.key) {
                 case 'ArrowRight':
                     e.preventDefault();
                     setCurrentQuestionIndex((prev) => 
                         prev < questions.length - 1 ? prev + 1 : 0
                     );
-                    setShowAnswer(false);
+                    setCurrentAnswerIndex(-1); // Reset answer index when changing questions
                     break;
                 case 'ArrowLeft':
                     e.preventDefault();
                     setCurrentQuestionIndex((prev) => 
                         prev > 0 ? prev - 1 : questions.length - 1
                     );
-                    setShowAnswer(false);
+                    setCurrentAnswerIndex(-1); // Reset answer index when changing questions
                     break;
                 case 'ArrowDown':
                     e.preventDefault();
-                    if (!showAnswer) {
-                        loadAnswerForQuestion(questions[currentQuestionIndex]);
+                    if (!questionAnswers[currentQuestion?.id]) {
+                        // Load answers if not loaded
+                        loadAnswerForQuestion(currentQuestion);
+                        setCurrentAnswerIndex(0);
+                    } else {
+                        // Navigate through answer images
+                        setCurrentAnswerIndex((prev) => {
+                            if (prev === -1) return 0; // Show first answer
+                            if (prev < answerImages.length - 1) return prev + 1; // Show next answer
+                            return prev; // Stay on last answer
+                        });
                     }
-                    setShowAnswer(true);
                     break;
                 case 'ArrowUp':
                     e.preventDefault();
-                    setShowAnswer(false);
+                    setCurrentAnswerIndex((prev) => {
+                        if (prev <= 0) return -1; // Hide answer
+                        return prev - 1; // Show previous answer
+                    });
                     break;
             }
         };
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [questions, currentQuestionIndex, showAnswer]);
+    }, [questions, currentQuestionIndex, currentAnswerIndex, questionAnswers]);
 
     const handleKeyDown = (e) => {
         if (e.key === 'Enter') {
@@ -185,7 +201,7 @@ const Dashboard = () => {
         setError(null);
         setHasSearched(true);
         setCurrentQuestionIndex(0);
-        setShowAnswer(false);
+        // setShowAnswer(false);
         
         try {
             const tagsString = tags.join(', ');
@@ -221,7 +237,9 @@ const Dashboard = () => {
             if (data.length > 0) {
                 setQuestionAnswers(prev => ({
                     ...prev,
-                    [question.id]: data[0].answer_image
+                    [question.id]: {
+                        answer_images: data[0].answer_images || [] // Use answer_images array
+                    }
                 }));
             }
         } catch (err) {
@@ -285,6 +303,10 @@ const Dashboard = () => {
 
 
     const currentQuestion = questions[currentQuestionIndex];
+    const currentAnswerImages = questionAnswers[currentQuestion?.id]?.answer_images || [];
+    const showAnswer = currentAnswerIndex >= 0;
+    const currentAnswerImage = showAnswer ? currentAnswerImages[currentAnswerIndex] : null;
+
 
     return (
         <div className="flex-1 flex flex-col h-full overflow-hidden">
@@ -471,7 +493,8 @@ const Dashboard = () => {
                                 <span className="text-sm text-neutral-600 dark:text-neutral-400">
                                     Question {currentQuestionIndex + 1} of {questions.length}
                                 </span>
-                                <div className="flex items-center gap-2">
+                                
+                                <div className="flex items-center gap-2 mt-2">
                                 <button
                                     onClick={() => markQuestionAsSolved(currentQuestion.id)}
                                     className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg transition-colors duration-200 flex items-center gap-2"
@@ -481,6 +504,17 @@ const Dashboard = () => {
                                     </svg>
                                     Mark as Solved
                                 </button>
+                                <button
+                                        onClick={() => {
+                                            if (!questionAnswers[currentQuestion.id]) {
+                                                loadAnswerForQuestion(currentQuestion);
+                                            }
+                                            setCurrentAnswerIndex(prev => prev === -1 ? 0 : -1);
+                                        }}
+                                        className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg"
+                                    >
+                                        {showAnswer ? 'Hide Answers' : 'Show Answers'}
+                                    </button>
                             </div>
                                 {/* {currentQuestion.last_solved_text && (
                                     <span className="text-xs text-neutral-500 dark:text-neutral-500">
@@ -490,39 +524,28 @@ const Dashboard = () => {
                             </div>
                             
                             <div className="flex items-center gap-2">
-                                {/* <button
-                                    onClick={() => {
-                                        setCurrentQuestionIndex(prev => 
-                                            prev > 0 ? prev - 1 : questions.length - 1
-                                        );
-                                        setShowAnswer(false);
-                                    }}
-                                    className="p-2 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700"
-                                >
-                                    ←
-                                </button> */}
-                                {/* <button
-                                    onClick={() => {
-                                        if (!showAnswer) {
-                                            loadAnswerForQuestion(currentQuestion);
-                                        }
-                                        setShowAnswer(!showAnswer);
-                                    }}
-                                    className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg"
-                                >
-                                    {showAnswer ? 'Hide Answer' : 'Show Answer'}
-                                </button> */}
-                                {/* <button
-                                    onClick={() => {
-                                        setCurrentQuestionIndex(prev => 
-                                            prev < questions.length - 1 ? prev + 1 : 0
-                                        );
-                                        setShowAnswer(false);
-                                    }}
-                                    className="p-2 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700"
-                                >
-                                    →
-                                </button> */}
+                                {/* Answer navigation buttons */}
+                                {currentAnswerImages.length > 0 && showAnswer && (
+                                    <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+                                        <button
+                                            onClick={() => setCurrentAnswerIndex(prev => Math.max(-1, prev - 1))}
+                                            disabled={currentAnswerIndex <= 0}
+                                            className="p-1 rounded bg-white dark:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            ↑
+                                        </button>
+                                        <span className="px-2 text-xs text-gray-600 dark:text-gray-400">
+                                            {currentAnswerIndex + 1}/{currentAnswerImages.length}
+                                        </span>
+                                        <button
+                                            onClick={() => setCurrentAnswerIndex(prev => Math.min(currentAnswerImages.length - 1, prev + 1))}
+                                            disabled={currentAnswerIndex >= currentAnswerImages.length - 1}
+                                            className="p-1 rounded bg-white dark:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            ↓
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         </div>
 
@@ -531,31 +554,36 @@ const Dashboard = () => {
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-full">
                                 {/* Question */}
                                 <div className="flex flex-col">
-                                    {/* <h3 className="text-lg font-semibold mb-3 text-center">Question</h3> */}
                                     <div className="flex-1 flex items-center justify-center bg-white dark:bg-zinc-800 rounded-xl border border-neutral-200 dark:border-neutral-700 p-4">
-                                        <img
-                                            src={`${BACKEND_URL}${currentQuestion.question_image}`}
-                                            alt={`Question ${currentQuestion.id}`}
-                                            className="max-w-full max-h-full object-contain"
-                                        />
+                                        <div className="h-[60vh] w-full overflow-auto flex items-start justify-center">
+                                            <img
+                                                src={`${BACKEND_URL}${currentQuestion.question_image}`}
+                                                alt={`Question ${currentQuestion.id}`}
+                                                className="max-w-full h-auto object-contain"
+                                            />
+                                        </div>
                                     </div>
                                 </div>
 
                                 {/* Answer */}
-                                <div className="flex flex-col">
-                                    {/* <h3 className="text-lg font-semibold mb-3 text-center">Answer</h3> */}
+                               <div className="flex flex-col">
                                     <div className="flex-1 flex items-center justify-center bg-white dark:bg-zinc-800 rounded-xl border border-neutral-200 dark:border-neutral-700 p-4">
-                                        {showAnswer && questionAnswers[currentQuestion.id] ? (
-                                            <img
-                                                src={`http://127.0.0.1:5000${questionAnswers[currentQuestion.id]}`}
-                                                alt={`Answer ${currentQuestion.id}`}
-                                                className="max-w-full max-h-full object-contain"
-                                            />
-                                        ) : (
-                                            <div className="text-center text-neutral-500 dark:text-neutral-400">
-                                                {showAnswer ? 'Loading answer...' : 'Press "Show Answer" or ↓ to reveal'}
-                                            </div>
-                                        )}
+                                        <div className="h-[60vh] w-full overflow-auto flex items-start justify-center">
+                                            {showAnswer && currentAnswerImage ? (
+                                                <img
+                                                    src={`${BACKEND_URL}${currentAnswerImage}`}
+                                                    alt={`Answer ${currentAnswerIndex + 1} for Question ${currentQuestion.id}`}
+                                                    className="max-w-full h-auto object-contain"
+                                                />
+                                            ) : (
+                                                <div className="text-center text-neutral-500 dark:text-neutral-400 flex items-center justify-center h-full">
+                                                    {questionAnswers[currentQuestion.id] && currentAnswerImages.length === 0 ? 
+                                                        'No answers available' : 
+                                                        showAnswer ? 'Loading answers...' : 'Press "Show Answers" or ↓ to reveal'
+                                                    }
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -563,7 +591,8 @@ const Dashboard = () => {
 
                         {/* Navigation hints */}
                         <div className="mt-4 text-center text-sm text-neutral-500 dark:text-neutral-400">
-                            Use ← → arrow keys to navigate questions • ↓ ↑ to show/hide answers
+                            Use ← → arrow keys to navigate questions • ↓ ↑ to navigate through answers • Multiple answers per question supported
+
                         </div>
                     </div>
                 )}

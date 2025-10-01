@@ -70,43 +70,61 @@ def login():
 
 @app.route('/api/admin/upload', methods=['POST'])
 def upload_question():
-    # Get files and tags from the request
-    question_file = request.files['question']
-    answer_file = request.files['answer']
-    tags = request.form.getlist('tags[]')  # tags[]: ["math", "science"]
+    question_file = request.files.get('question')
+    if not question_file:
+        return jsonify({'error': 'Question file is required'}), 400
 
-
-
-    # Save images to disk (e.g., static/questions/)
-    # q_filename = os.path.join('static/questions', question_file.filename)
-    # a_filename = os.path.join('static/answers', answer_file.filename)
-
-
-    q_filename = os.path.join('static/questions', unique_filename(question_file.filename))
-    a_filename = os.path.join('static/answers', unique_filename(answer_file.filename))
-    os.makedirs(os.path.dirname(q_filename), exist_ok=True)
-    os.makedirs(os.path.dirname(a_filename), exist_ok=True)
-
-    question_file.save(q_filename)
-    answer_file.save(a_filename)
-
+    tags = request.form.getlist('tags[]')
     
+    # Get multiple answer files - check all possible answer_N keys
+    answer_files = []
+    for i in range(5):  # Check for answer_0, answer_1, etc.
+        answer_key = f'answer_{i}'
+        if answer_key in request.files:
+            answer_files.append(request.files[answer_key])
+    
+    # Also check for 'answer' key for backward compatibility
+    if 'answer' in request.files:
+        # If it's a single file, add it
+        answer_file = request.files['answer']
+        if answer_file:
+            answer_files.append(answer_file)
+    
+    if not answer_files:
+        return jsonify({'error': 'At least one answer file is required'}), 400
+
+    # Save question image
+    q_filename = os.path.join('static/questions', unique_filename(question_file.filename))
+    os.makedirs(os.path.dirname(q_filename), exist_ok=True)
+    question_file.save(q_filename)
+
     # Insert question
     cursor.execute(
-        "INSERT INTO questions (question_image, answer_image) VALUES (%s, %s)",
-        (q_filename, a_filename)
+        "INSERT INTO questions (question_image) VALUES (%s)",
+        (q_filename,)
     )
     db.commit()
     question_id = cursor.lastrowid
 
-    # Insert tags and question_tags
+    # Save and insert answer images
+    for i, answer_file in enumerate(answer_files):
+        if answer_file and answer_file.filename:
+            a_filename = os.path.join('static/answers', unique_filename(answer_file.filename))
+            os.makedirs(os.path.dirname(a_filename), exist_ok=True)
+            answer_file.save(a_filename)
+            
+            cursor.execute(
+                "INSERT INTO question_answers (question_id, answer_image, answer_order) VALUES (%s, %s, %s)",
+                (question_id, a_filename, i + 1)
+            )
+            db.commit()
+
+    # Insert tags (existing code)
     for tag in tags:
-        # Insert tag if not exists
         cursor.execute("INSERT IGNORE INTO tags (name) VALUES (%s)", (tag,))
         db.commit()
         cursor.execute("SELECT id FROM tags WHERE name=%s", (tag,))
         tag_id = cursor.fetchone()['id']
-        # Link question and tag
         cursor.execute(
             "INSERT INTO question_tags (question_id, tag_id) VALUES (%s, %s)",
             (question_id, tag_id)
@@ -352,18 +370,35 @@ def get_questions_by_ids():
 
     placeholders = ','.join(['%s'] * len(ids))
     query = f"""
-        SELECT id, question_image, answer_image
-        FROM questions
-        WHERE id IN ({placeholders})
+        SELECT q.id, q.question_image, qa.answer_image, qa.answer_order
+        FROM questions q
+        LEFT JOIN question_answers qa ON q.id = qa.question_id
+        WHERE q.id IN ({placeholders})
+        ORDER BY q.id, qa.answer_order
     """
     cursor.execute(query, tuple(ids))
-    questions = cursor.fetchall()
+    results = cursor.fetchall()
     cursor.close()
     db.close()
-    for q in questions:
-        q['question_image'] = '/' + q['question_image'] if not q['question_image'].startswith('/') else q['question_image']
-        q['answer_image'] = '/' + q['answer_image'] if not q['answer_image'].startswith('/') else q['answer_image']
-    return jsonify(questions)
+    # for q in questions:
+    #     q['question_image'] = '/' + q['question_image'] if not q['question_image'].startswith('/') else q['question_image']
+    #     q['answer_image'] = '/' + q['answer_image'] if not q['answer_image'].startswith('/') else q['answer_image']
+    # return jsonify(questions)
+    questions = {}
+    for row in results:
+        q_id = row['id']
+        if q_id not in questions:
+            questions[q_id] = {
+                'id': q_id,
+                'question_image': '/' + row['question_image'] if not row['question_image'].startswith('/') else row['question_image'],
+                'answer_images': []
+            }
+        
+        if row['answer_image']:
+            answer_path = '/' + row['answer_image'] if not row['answer_image'].startswith('/') else row['answer_image']
+            questions[q_id]['answer_images'].append(answer_path)
+    
+    return jsonify(list(questions.values()))
 
 
 @app.route('/api/questions/completed', methods=['GET'])
