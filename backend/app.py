@@ -350,24 +350,17 @@ def mark_question_complete(question_id):
 @app.route('/api/questions_by_ids', methods=['GET'])
 def get_questions_by_ids():
     ids_param = request.args.get('ids')
-    if not ids_param:
-        return jsonify([])
-    try:
-        ids = [int(i) for i in ids_param.split(',') if i.strip().isdigit()]
-    except Exception:
-        return jsonify({'error': 'Invalid ids'}), 400
-    if not ids:
+    username = request.args.get('username')  # Pass username in the request
+
+    if not ids_param or not username:
         return jsonify([])
 
-    # Create a new connection and cursor for this request
-    db = mysql.connector.connect(
-        host="localhost",
-        user="root",
-        password=DB_PASSWORD,
-        database="qnahub"
-    )
-    cursor = db.cursor(dictionary=True)
+    # Get user role
+    cursor.execute("SELECT role FROM userCreds WHERE username=%s", (username,))
+    user = cursor.fetchone()
+    role = user['role'] if user else 'user'
 
+    ids = [int(i) for i in ids_param.split(',') if i.strip().isdigit()]
     placeholders = ','.join(['%s'] * len(ids))
     query = f"""
         SELECT q.id, q.question_image, qa.answer_image, qa.answer_order
@@ -378,12 +371,7 @@ def get_questions_by_ids():
     """
     cursor.execute(query, tuple(ids))
     results = cursor.fetchall()
-    cursor.close()
-    db.close()
-    # for q in questions:
-    #     q['question_image'] = '/' + q['question_image'] if not q['question_image'].startswith('/') else q['question_image']
-    #     q['answer_image'] = '/' + q['answer_image'] if not q['answer_image'].startswith('/') else q['answer_image']
-    # return jsonify(questions)
+
     questions = {}
     for row in results:
         q_id = row['id']
@@ -393,13 +381,16 @@ def get_questions_by_ids():
                 'question_image': '/' + row['question_image'] if not row['question_image'].startswith('/') else row['question_image'],
                 'answer_images': []
             }
-        
         if row['answer_image']:
             answer_path = '/' + row['answer_image'] if not row['answer_image'].startswith('/') else row['answer_image']
             questions[q_id]['answer_images'].append(answer_path)
-    
-    return jsonify(list(questions.values()))
 
+    # Filter answer images based on role
+    for q in questions.values():
+        if role == 'limited':
+            q['answer_images'] = q['answer_images'][:1]  # Only first answer image
+
+    return jsonify(list(questions.values()))
 
 @app.route('/api/questions/completed', methods=['GET'])
 def get_completed_questions():

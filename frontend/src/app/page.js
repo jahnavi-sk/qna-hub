@@ -59,6 +59,7 @@ export default function LoginPg() {
     const data = await res.json();
     if (data.success) {
       alert("Login successful!");
+      localStorage.setItem("currentUsername", username);
       router.replace("/user");
       // Redirect or set user state here
     } else {
@@ -148,7 +149,7 @@ export default function LoginPg() {
               </p>
               <form className="my-8" onSubmit={handleUserLogin}>
                 <LabelInputContainer className="mb-4">
-                  <Label htmlFor="firstname">Email Address</Label>
+                  <Label htmlFor="firstname">Username</Label>
                   <Input id="firstname" placeholder="viratkohli" type="text" />
                 </LabelInputContainer>
                 <LabelInputContainer className="mb-4">
@@ -221,7 +222,7 @@ export default function LoginPg() {
                   onClick={() => setFormType("signup")}
                 >
                   Switch to User Sign Up
-                </button>
+                </button> 
                 <button
                   className="mt-2 text-sm text-blue-500 underline hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-700 dark:hover:text-blue-300 px-2 py-1 rounded transition-all duration-200"
                   type="button"

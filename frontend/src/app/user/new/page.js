@@ -124,6 +124,8 @@ const Dashboard = () => {
     const [unsolvedOnly, setUnsolvedOnly] = useState(false); // New state for filter
 
     const BACKEND_URL = 'http://127.0.0.1:5000/';
+    const currentUsername = typeof window !== "undefined" ? localStorage.getItem("currentUsername") : null;
+
 
     // Keyboard navigation
     useEffect(() => {
@@ -228,7 +230,7 @@ const Dashboard = () => {
         if (questionAnswers[question.id]) return; // Already loaded
 
         try {
-            const response = await fetch(`${BACKEND_URL}api/questions_by_ids?ids=${question.id}`);
+            const response = await fetch(`${BACKEND_URL}api/questions_by_ids?ids=${question.id}&username=${currentUsername}`);
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
