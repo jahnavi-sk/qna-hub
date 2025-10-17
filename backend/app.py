@@ -355,6 +355,15 @@ def get_questions_by_ids():
     if not ids_param or not username:
         return jsonify([])
 
+
+    db = mysql.connector.connect(
+        host="localhost",
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database="qnahub"
+    )
+    cursor = db.cursor(dictionary=True)
+
     # Get user role
     cursor.execute("SELECT role FROM userCreds WHERE username=%s", (username,))
     user = cursor.fetchone()
@@ -387,6 +396,7 @@ def get_questions_by_ids():
 
     # Filter answer images based on role
     for q in questions.values():
+        print("role = " + role)
         if role == 'limited':
             q['answer_images'] = q['answer_images'][:1]  # Only first answer image
 
@@ -400,7 +410,7 @@ def get_completed_questions():
     # Create a new connection for this request
     db = mysql.connector.connect(
         host="localhost",
-        user="root",
+        user=DB_USER,
         password=DB_PASSWORD,
         database="qnahub"
     )
@@ -423,6 +433,119 @@ def get_completed_questions():
     for q in questions:
         q['question_image'] = '/' + q['question_image'] if not q['question_image'].startswith('/') else q['question_image']
     return jsonify(questions)
+
+@app.route('/api/questions/<int:question_id>/tags', methods=['GET'])
+def get_question_tags(question_id):
+
+    db = mysql.connector.connect(
+        host="localhost",
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database="qnahub"
+    )
+    cursor = db.cursor(dictionary=True)
+    
+    cursor.execute("""
+        SELECT t.name 
+        FROM tags t 
+        JOIN question_tags qt ON t.id = qt.tag_id 
+        WHERE qt.question_id = %s
+    """, (question_id,))
+    
+    tags = [row['name'] for row in cursor.fetchall()]
+    return jsonify({'tags': tags})
+
+@app.route('/api/admin/edit', methods=['POST'])
+def edit_question():
+    question_id = request.form.get('question_id')
+    
+    if not question_id:
+        return jsonify({'error': 'Question ID is required'}), 400
+    
+
+    
+    
+    # Update question image if provided
+    if 'question' in request.files:
+        question_file = request.files['question']
+        q_filename = os.path.join('static/questions', unique_filename(question_file.filename))
+        os.makedirs(os.path.dirname(q_filename), exist_ok=True)
+        question_file.save(q_filename)
+        
+        cursor.execute(
+            "UPDATE questions SET question_image = %s WHERE id = %s",
+            (q_filename, question_id)
+        )
+        db.commit()
+    
+    # Update answer images if provided
+    answer_files = []
+    for i in range(5):
+        answer_key = f'answer_{i}'
+        if answer_key in request.files:
+            answer_files.append(request.files[answer_key])
+    
+    remove_answer_images = request.form.getlist('remove_answer_images[]')
+    if remove_answer_images:
+        print("Removing answer images:", remove_answer_images)
+        for img_path in remove_answer_images:
+            db_path = img_path.lstrip('/')  # Remove leading slash
+            cursor.execute("DELETE FROM question_answers WHERE question_id = %s AND answer_image = %s", (question_id, db_path))
+            db.commit()
+            # Optionally, delete the file from disk:
+            try:
+                os.remove(os.path.join('static/answers', os.path.basename(img_path)))
+            except Exception:
+                pass
+
+        # 2. Get remaining answer images (after removals)
+    cursor.execute("SELECT answer_image FROM question_answers WHERE question_id = %s ORDER BY answer_order", (question_id,))
+    existing_answers = [row['answer_image'] for row in cursor.fetchall()]
+
+    # 3. Add new answer images (append to existing)
+    new_answer_files = []
+    for i in range(5):
+        answer_key = f'answer_{i}'
+        if answer_key in request.files:
+            new_answer_files.append(request.files[answer_key])
+
+    for answer_file in new_answer_files:
+        if answer_file and answer_file.filename:
+            a_filename = os.path.join('static/answers', unique_filename(answer_file.filename))
+            os.makedirs(os.path.dirname(a_filename), exist_ok=True)
+            answer_file.save(a_filename)
+            existing_answers.append(a_filename)
+
+    # 4. Remove all old answer rows and re-insert with correct order
+    cursor.execute("DELETE FROM question_answers WHERE question_id = %s", (question_id,))
+    db.commit()
+    for idx, img_path in enumerate(existing_answers):
+        cursor.execute(
+            "INSERT INTO question_answers (question_id, answer_image, answer_order) VALUES (%s, %s, %s)",
+            (question_id, img_path, idx + 1)
+        )
+        db.commit()
+    
+    # Update tags if provided
+    tags = request.form.getlist('tags[]')
+    if tags:
+        # Delete old tags
+        cursor.execute("DELETE FROM question_tags WHERE question_id = %s", (question_id,))
+        db.commit()
+        
+        # Add new tags
+        for tag in tags:
+            cursor.execute("INSERT IGNORE INTO tags (name) VALUES (%s)", (tag,))
+            db.commit()
+            cursor.execute("SELECT id FROM tags WHERE name=%s", (tag,))
+            tag_id = cursor.fetchone()['id']
+            cursor.execute(
+                "INSERT INTO question_tags (question_id, tag_id) VALUES (%s, %s)",
+                (question_id, tag_id)
+            )
+            db.commit()
+    
+    return jsonify({'success': True}), 200
 
 
 if __name__ == '__main__':

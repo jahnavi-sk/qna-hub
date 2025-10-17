@@ -126,6 +126,13 @@ const Dashboard = () => {
     const BACKEND_URL = 'http://127.0.0.1:5000/';
     const currentUsername = typeof window !== "undefined" ? localStorage.getItem("currentUsername") : null;
 
+    const [recentTags, setRecentTags] = useState([]);
+    const [showSuggestions, setShowSuggestions] = useState(false);
+
+    useEffect(() => {
+    const saved = localStorage.getItem("recentTags");
+    if (saved) setRecentTags(JSON.parse(saved));
+    }, []);
 
     // Keyboard navigation
     useEffect(() => {
@@ -183,18 +190,25 @@ const Dashboard = () => {
     }, [questions, currentQuestionIndex, currentAnswerIndex, questionAnswers]);
 
     const handleKeyDown = (e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            if (inputValue.trim()) {
-                // Add new tag
-                const newTag = inputValue.trim();
-                if (!enteredTags.includes(newTag)) {
-                    setEnteredTags(prev => [...prev, newTag]);
-                    setInputValue(''); // Clear input after adding tag
-                }
-            }
-        }
-    };
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    if (inputValue.trim()) {
+      addTag(inputValue.trim());
+    }
+  }
+};
+
+
+    const addTag = (tag) => {
+  if (!enteredTags.includes(tag)) {
+    setEnteredTags(prev => [...prev, tag]);
+    setInputValue('');
+    // Update recent tags
+    const updated = [tag, ...recentTags.filter(t => t !== tag)].slice(0, 10);
+    setRecentTags(updated);
+    localStorage.setItem("recentTags", JSON.stringify(updated));
+  }
+};
 
     const fetchQuestions = async (tags,filterUnsolved = unsolvedOnly) => {
         if (!tags || tags.length === 0) return;
@@ -365,11 +379,31 @@ const Dashboard = () => {
                         <input
                             type="text"
                             value={inputValue}
-                            onChange={(e) => setInputValue(e.target.value)}
+                            onChange={(e) => {
+                            setInputValue(e.target.value);
+                            setShowSuggestions(true);
+                            }}
                             onKeyDown={handleKeyDown}
+                            onFocus={() => setShowSuggestions(true)}
+                            onBlur={() => setTimeout(() => setShowSuggestions(false), 100)}
                             placeholder="Type a tag and press Enter to add it..."
-                            className="w-full h-12 px-6 pr-16 rounded-xl bg-white dark:bg-zinc-800 text-sm text-neutral-900 dark:text-white placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 border-2 border-neutral-200 dark:border-neutral-700 transition-all duration-300 shadow-sm hover:shadow-md"
+                            className="w-full h-12 px-6 pr-16 rounded-xl ..."
                         />
+                        {showSuggestions && inputValue && (
+                            <ul className="absolute left-0 right-0 bg-black border border-gray-200 rounded shadow mt-1 z-10">
+                            {recentTags
+                                .filter(tag => tag.toLowerCase().includes(inputValue.toLowerCase()) && !enteredTags.includes(tag))
+                                .map((tag, idx) => (
+                                <li
+                                    key={idx}
+                                    className="px-3 py-2 cursor-pointer hover:bg-blue-100"
+                                    onMouseDown={() => addTag(tag)}
+                                >
+                                    {tag}
+                                </li>
+                                ))}
+                            </ul>
+                        )}
                         
                         {/* Search button */}
                         <button
